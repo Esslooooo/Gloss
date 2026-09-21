@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Gloss",
+  "version": "7.0",
+  "description": "双击拾词 — 双击网页上的英文单词，秒出释义，自动加入生词本，支持 SM-2 复习",
+  "permissions": ["storage", "unlimitedStorage", "offscreen", "tabs", "alarms"],
+  "host_permissions": [
+    "https://dict.youdao.com/*",
+    "https://aidemo.youdao.com/*",
+    "https://fanyi.youdao.com/*",
+    "https://api.mymemory.translated.net/*",
+    "https://api.dictionaryapi.dev/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*"],
+      "js": ["content.js"],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["dict/*.json"],
+      "matches": ["http://*/*", "https://*/*"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "Gloss",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}

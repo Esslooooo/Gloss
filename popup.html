@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+
+<div class="view active" id="view-list">
+  <div class="titlebar">
+    <button class="power-btn" id="powerBtn" title="启用/暂停">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M18.36 6.64a9 9 0 1 1-12.73 0"></path>
+        <line x1="12" y1="2" x2="12" y2="12"></line>
+      </svg>
+    </button>
+    <div class="title">Gloss</div>
+    <button class="icon-btn" id="settingsBtn" title="设置">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+      </svg>
+    </button>
+  </div>
+  <div class="searchbar">
+    <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="11" cy="11" r="8"></circle>
+      <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+    </svg>
+    <input type="text" id="searchBox" placeholder="搜索">
+  </div>
+  <div class="filters" id="filters">
+    <button class="filter active" data-filter="all">全部</button>
+    <button class="filter" data-filter="review">待复习</button>
+    <button class="filter" data-filter="starred">收藏</button>
+    <button class="filter" data-filter="mastered">已掌握</button>
+  </div>
+  <div class="list" id="wordList"></div>
+</div>
+
+<div class="view" id="view-detail">
+  <div class="titlebar">
+    <button class="icon-btn" id="backBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <div class="title"></div>
+    <div style="width:32px"></div>
+  </div>
+  <div class="detail-content" id="detailContent"></div>
+</div>
+
+<div class="view" id="view-clips">
+  <div class="titlebar">
+    <div class="title">摘抄</div>
+    <div style="width:32px"></div>
+  </div>
+  <div class="clips-body" id="clipsBody"></div>
+</div>
+
+<div class="view" id="view-review">
+  <div class="titlebar">
+    <div class="title">复习</div>
+    <div style="width:32px"></div>
+  </div>
+  <div class="review-body" id="reviewBody">
+    <div class="review-empty" id="reviewEmpty">
+      <div class="empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+          <polyline points="22 4 12 14.01 9 11.01"></polyline>
+        </svg>
+      </div>
+      <div class="empty-title">暂无待复习</div>
+      <div class="empty-sub">双击网页上的英文单词，Gloss 会帮你拾起来</div>
+    </div>
+    <div class="review-card" id="reviewCard" style="display:none;">
+      <div class="review-progress" id="reviewProgress"></div>
+      <div class="review-word" id="reviewWord"></div>
+      <div class="review-phonetic" id="reviewPhonetic"></div>
+      <div class="review-meaning" id="reviewMeaning"></div>
+      <div class="review-front" id="reviewFront">
+        <button class="btn-primary" id="showAnswerBtn">显示释义</button>
+        <button class="btn-secondary" id="skipBtn">下一个</button>
+      </div>
+      <div class="review-grades" id="reviewGrades">
+        <button class="grade" data-q="0"></span>忘记<small>1</small></button>
+        <button class="grade" data-q="3"></span>模糊<small>2</small></button>
+        <button class="grade" data-q="4"></span>记得<small>3</small></button>
+        <button class="grade" data-q="5"></span>秒答<small>4</small></button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="view" id="view-settings">
+  <div class="titlebar">
+    <button class="icon-btn" id="settingsBackBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="15 18 9 12 15 6"></polyline>
+      </svg>
+    </button>
+    <div class="title">设置</div>
+    <div style="width:32px"></div>
+  </div>
+  <div class="settings-content">
+    <div class="settings-group">
+      <div class="settings-label">当前网站</div>
+      <div id="currentSiteBox">
+        <div class="site-domain" id="currentDomain">加载中...</div>
+        <button class="site-toggle-btn" id="toggleSiteBtn">加入黑名单</button>
+      </div>
+    </div>
+    <div class="settings-group" id="blacklistGroup" style="display:none;">
+      <div class="settings-label">黑名单</div>
+      <div id="blacklistItems"></div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-label">词典源</div>
+      <select id="dictSourceSelect" class="settings-select">
+        <option value="auto">本地优先</option>
+        <option value="online-first">在线优先</option>
+        <option value="local">只查本地</option>
+        <option value="online">只查在线</option>
+      </select>
+    </div>
+    <div class="settings-group">
+      <div class="settings-label">本地词典</div>
+      <div id="localDictStatus">
+        <div class="dict-status-text" id="dictStatusText">检查中...</div>
+      </div>
+      <div id="dictProgressWrap" style="display:none;margin-top:10px;">
+        <div class="progress-bar"><div class="progress-fill" id="dictProgressFill"></div></div>
+        <div class="progress-text" id="dictProgressText">0 / 0</div>
+      </div>
+      <div id="dictActions" style="margin-top:10px;">
+        <button class="settings-btn" id="downloadDictBtn">下载本地词典</button>
+        <button class="settings-btn danger" id="clearDictBtn" style="display:none;">清除本地词典</button>
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-label">在线词典</div>
+      <select id="onlineSourceSelect" class="settings-select">
+        <option value="youdao">有道词典</option>
+        <option value="freedict">Free Dictionary</option>
+      </select>
+      <button class="settings-btn" id="testApiBtn">测试连通性</button>
+      <div class="settings-hint" id="apiStatusHint"></div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-label">数据管理</div>
+      <button class="settings-btn" id="exportBtn">导出 JSON</button>
+      <button class="settings-btn" id="importBtn">导入 JSON</button>
+      <input type="file" id="importFile" accept=".json" style="display:none">
+    </div>
+  </div>
+</div>
+
+<div class="tabbar" id="tabbar">
+  <button class="tab active" data-view="list">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
+      <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
+    </svg>
+    <span>词库</span>
+    <span class="badge" id="listBadge">0</span>
+  </button>
+  <button class="tab" data-view="clips">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z"></path>
+    </svg>
+    <span>摘抄</span>
+    <span class="badge" id="clipsBadge">0</span>
+  </button>
+  <button class="tab" data-view="review">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="23 4 23 10 17 10"></polyline>
+      <polyline points="1 20 1 14 7 14"></polyline>
+      <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"></path>
+    </svg>
+    <span>复习</span>
+    <span class="badge" id="reviewBadge">0</span>
+  </button>
+</div>
+
+<div class="context-menu" id="contextMenu">
+  <button data-action="star">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon>
+    </svg>
+    <span>收藏</span>
+  </button>
+  <button data-action="edit">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+      <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+    </svg>
+    <span>编辑笔记</span>
+  </button>
+  <button data-action="delete" class="danger">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polyline points="3 6 5 6 21 6"></polyline>
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+    </svg>
+    <span>删除</span>
+  </button>
+</div>
+
+<script src="popup.js"></script>
+</body>
+</html>
