@@ -503,6 +503,7 @@ document.addEventListener('keydown', (e) => {
 function renderDictUI(r) {
   const statusEl = document.getElementById('dictStatusText');
   const downloadBtn = document.getElementById('downloadDictBtn');
+  const cancelBtn = document.getElementById('cancelDictBtn');
   const clearBtn = document.getElementById('clearDictBtn');
   const progressWrap = document.getElementById('dictProgressWrap');
   const progressFill = document.getElementById('dictProgressFill');
@@ -524,6 +525,7 @@ function renderDictUI(r) {
     progressText.textContent = progress.current + ' / ' + progress.total + ' 分片 · ' + (progress.loaded || 0).toLocaleString() + ' 词条';
     downloadBtn.textContent = '下载中...';
     downloadBtn.disabled = true;
+    if (cancelBtn) cancelBtn.style.display = 'block';
     clearBtn.style.display = 'none';
   } else if (status === 'installed' && count > 0) {
     statusEl.textContent = '已安装 · ' + count.toLocaleString() + ' 词条';
@@ -531,6 +533,7 @@ function renderDictUI(r) {
     progressWrap.style.display = 'none';
     downloadBtn.textContent = '重新下载';
     downloadBtn.disabled = false;
+    if (cancelBtn) cancelBtn.style.display = 'none';
     clearBtn.style.display = 'block';
   } else if (status === 'failed') {
     statusEl.textContent = '下载失败：' + (error || '未知原因');
@@ -538,6 +541,7 @@ function renderDictUI(r) {
     progressWrap.style.display = 'none';
     downloadBtn.textContent = '重试下载';
     downloadBtn.disabled = false;
+    if (cancelBtn) cancelBtn.style.display = 'none';
     clearBtn.style.display = 'none';
   } else {
     statusEl.textContent = '未安装';
@@ -545,6 +549,7 @@ function renderDictUI(r) {
     progressWrap.style.display = 'none';
     downloadBtn.textContent = '下载本地词典';
     downloadBtn.disabled = false;
+    if (cancelBtn) cancelBtn.style.display = 'none';
     clearBtn.style.display = 'none';
   }
 }
@@ -634,7 +639,6 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 on('downloadDictBtn', 'click', async () => {
-  // 从 CDN 拉取词典（默认走 background.js 里的 DEFAULT_DICT_BASE）
   await chrome.storage.local.set({ _dictBaseUrl: '' });
 
   chrome.runtime.sendMessage({ type: 'DICT_DOWNLOAD' }, function() {
@@ -644,6 +648,21 @@ on('downloadDictBtn', 'click', async () => {
   setTimeout(() => { updateDictStatus(); updateStorageInfo(); }, 200);
 });
 
+on('cancelDictBtn', 'click', async () => {
+  const btn = document.getElementById('cancelDictBtn');
+  btn.disabled = true;
+  btn.textContent = '正在取消...';
+  try {
+    await chrome.runtime.sendMessage({ type: 'DICT_CANCEL' });
+    await updateDictStatus();
+    await updateStorageInfo();
+  } catch (e) {
+    console.warn('[Gloss Popup] 取消失败:', e);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '取消下载';
+  }
+});
 let clearConfirming = false;
 on('clearDictBtn', 'click', async () => {
   const btn = document.getElementById('clearDictBtn');

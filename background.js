@@ -1,17 +1,21 @@
 // ============================================================
 // 全局
 // ============================================================
-const DICT_FILE_START = 1;
-const DICT_FILE_END = 608;
-const BATCH_SIZE = 20;
+const DICT_PART_START = 1;
+const DICT_PART_END = 10;
+const BATCH_SIZE = 1;
+const WRITE_CHUNK = 1000;
 const ONLINE_TIMEOUT_MS = 8000;
+const STALE_TIMEOUT = 2 * 60 * 1000;
 
-const DEFAULT_DICT_BASE = 'https://cdn.jsdelivr.net/gh/Esslooooo/gloss@main/dict/';
+const DEFAULT_DICT_BASE = 'https://fastly.jsdelivr.net/gh/Esslooooo/gloss@main/dict-parts/';
 
 const ONLINE_SOURCES = {
   youdao: 'https://dict.youdao.com/jsonapi?q=',
   freedict: 'https://api.dictionaryapi.dev/api/v2/entries/en/'
 };
+
+let downloadCancelled = false;
 
 console.log('[Gloss BG] background.js 已执行');
 
@@ -36,36 +40,52 @@ function openDB() {
 
 async function dbPutBatch(entries) {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readwrite');
-    const store = tx.objectStore(STORE_NAME);
-    for (const [k, v] of entries) store.put(v, k);
-    tx.oncomplete = () => resolve();
-    tx.onerror = (e) => reject(e.target.error);
-  });
+  try {
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readwrite');
+      const store = tx.objectStore(STORE_NAME);
+      for (const [k, v] of entries) {
+        try { store.put(v, k); } catch (e) {}
+      }
+      tx.oncomplete = () => resolve();
+      tx.onerror = (e) => reject(e.target.error);
+      tx.onabort = () => reject(new Error('事务中止'));
+    });
+  } finally {
+    try { db.close(); } catch (e) {}
+  }
 }
 
 async function dbGet(key) {
   const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.get(key);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = (e) => reject(e.target.error);
-  });
+  try {
+    return await new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE_NAME, 'readonly');
+      const store = tx.objectStore(STORE_NAME);
+      const req = store.get(key);
+      req.onsuccess = () => resolve(req.result);
+      req.onerror = (e) => reject(e.target.error);
+    });
+  } finally {
+    try { db.close(); } catch (e) {}
+  }
 }
-
 
 async function dbDestroy() {
   return new Promise((resolve) => {
     try {
       const req = indexedDB.deleteDatabase(DB_NAME);
-      req.onsuccess = () => { console.log('[Gloss BG] DB 已删除'); resolve(); };
-      req.onerror = () => { console.log('[Gloss BG] DB 删除错误'); resolve(); };
+      let done = false;
+      const finish = () => { if (!done) { done = true; resolve(); } };
+      req.onsuccess = () => { console.log('[Gloss BG] DB 已删除'); finish(); };
+      req.onerror = () => { console.log('[Gloss BG] DB 删除错误'); finish(); };
       req.onblocked = () => {
-        console.log('[Gloss BG] DB 删除被阻止（有活动连接），等待...');
-        setTimeout(resolve, 500);
+        console.log('[Gloss BG] DB 删除被阻止，等待连接释放...');
+        let waited = 0;
+        const iv = setInterval(() => {
+          waited += 100;
+          if (waited >= 3000) { clearInterval(iv); finish(); }
+        }, 100);
       };
     } catch (e) {
       console.error('[Gloss BG] DB 删除异常:', e);
@@ -74,67 +94,57 @@ async function dbDestroy() {
   });
 }
 
-async function dbCount() {
-  const db = await openDB();
-  return new Promise((resolve, reject) => {
-    const tx = db.transaction(STORE_NAME, 'readonly');
-    const store = tx.objectStore(STORE_NAME);
-    const req = store.count();
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = (e) => reject(e.target.error);
-  });
-}
-
 // ============================================================
-// 判断词典是否安装
+// 词典状态
 // ============================================================
-let dictInstalledCache = null; // null = 未知, true = 已装, false = 未装
-
+let dictInstalledCache = null;
 
 (async function initCache() {
   try {
     const r = await chrome.storage.local.get(['_dictInstalled']);
-    if (r._dictInstalled === true) {
-      dictInstalledCache = true;
-      console.log('[Gloss BG] 从 storage 恢复词典状态：已安装');
-    } else if (r._dictInstalled === false) {
-      dictInstalledCache = false;
-    }
+    if (r._dictInstalled === true) dictInstalledCache = true;
+    else if (r._dictInstalled === false) dictInstalledCache = false;
   } catch (e) {}
 })();
 
 async function isDictInstalled() {
-  // 有缓存直接用
   if (dictInstalledCache !== null) return dictInstalledCache;
 
   try {
-    // 探针：查 "the" 是否存在
-    const probe = await dbGet('the');
-    dictInstalledCache = !!probe;
-    console.log('[Gloss BG] 词典探针检查: ' + (dictInstalledCache ? '已安装' : '未安装'));
-    return dictInstalledCache;
-  } catch (e) {
-    dictInstalledCache = false;
-    return false;
-  }
+    const r = await chrome.storage.local.get(['_dictInstalled']);
+    if (r._dictInstalled === true) { dictInstalledCache = true; return true; }
+    if (r._dictInstalled === false) { dictInstalledCache = false; return false; }
+  } catch (e) {}
+
+  try {
+    const probes = ['a', 'i', 'in', 'is', 'to', 'the'];
+    for (const p of probes) {
+      const hit = await dbGet(p);
+      if (hit) { dictInstalledCache = true; return true; }
+    }
+  } catch (e) {}
+
+  dictInstalledCache = false;
+  return false;
 }
 
 async function getDictRealStatus() {
   try {
-    const probe = await dbGet('the');
-    const installed = !!probe;
-    dictInstalledCache = installed;
-
-    if (!installed) {
-      return { installed: false, count: 0 };
-    }
-
-    // 词条数从 storage 缓存里读，不扫描
-    const r = await chrome.storage.local.get(['_dictCount']);
-    return { installed: true, count: r._dictCount || 0 };
+    const r = await chrome.storage.local.get([
+      '_dictInstalled', '_dictCount', '_dictStatus', '_dictProgress',
+      '_dictError', '_dictBytes', '_dictBytesTotal'
+    ]);
+    return {
+      installed: r._dictInstalled === true,
+      count: r._dictCount || 0,
+      status: r._dictStatus || (r._dictInstalled ? 'installed' : 'not_installed'),
+      progress: r._dictProgress || null,
+      error: r._dictError || null,
+      bytes: r._dictBytes || 0,
+      bytesTotal: r._dictBytesTotal || 0
+    };
   } catch (e) {
-    dictInstalledCache = false;
-    return { installed: false, count: 0 };
+    return { installed: false, count: 0, status: 'not_installed', progress: null, error: null, bytes: 0, bytesTotal: 0 };
   }
 }
 
@@ -144,10 +154,7 @@ async function getDictRealStatus() {
 let offscreenCreating = null;
 async function ensureOffscreen() {
   if (!chrome.offscreen) throw new Error('不支持 offscreen API');
-  try {
-    const has = await chrome.offscreen.hasDocument();
-    if (has) return;
-  } catch (e) {}
+  try { if (await chrome.offscreen.hasDocument()) return; } catch (e) {}
   if (offscreenCreating) return offscreenCreating;
   offscreenCreating = chrome.offscreen.createDocument({
     url: 'offscreen.html',
@@ -171,38 +178,68 @@ async function playAudio(url) {
 // 保活
 // ============================================================
 chrome.alarms.onAlarm.addListener((alarm) => {
-  if (alarm.name === 'dictKeepAlive') console.log('[Gloss BG] 词典下载保活 ping');
+  if (alarm.name === 'dictKeepAlive') console.log('[Gloss BG] 下载保活 ping');
 });
 
 // ============================================================
-// 下载词典
+// 下载
 // ============================================================
 async function startDictionaryDownload() {
-  const r = await chrome.storage.local.get(['_dictStatus']);
+  const r = await chrome.storage.local.get(['_dictStatus', '_dictProgress']);
+
   if (r._dictStatus === 'downloading') {
-    return { success: true, alreadyRunning: true };
+    const progress = r._dictProgress || {};
+    const startedAt = progress.startedAt || 0;
+    const elapsed = Date.now() - startedAt;
+
+    if (elapsed < STALE_TIMEOUT && (progress.current || 0) < DICT_PART_END) {
+      console.log('[Gloss BG] 已有下载任务在进行中');
+      return { success: true, alreadyRunning: true };
+    }
+    console.log('[Gloss BG] 检测到僵尸/已完成下载状态，强制重置');
   }
+
+  downloadCancelled = false;
 
   await chrome.storage.local.set({
     _dictStatus: 'downloading',
-    _dictProgress: { current: 0, total: DICT_FILE_END, loaded: 0, startedAt: Date.now() },
+    _dictProgress: { current: 0, total: DICT_PART_END, loaded: 0, startedAt: Date.now() },
     _dictError: null,
     _dictBytes: 0,
-    _dictBytesTotal: 0
+    _dictBytesTotal: 0,
+    _dictInstalled: false,
+    _dictCount: 0
   });
 
   chrome.alarms.create('dictKeepAlive', { periodInMinutes: 0.5 });
 
   runDictionaryDownload().catch(async (err) => {
-    console.error('[Gloss BG] 下载任务失败:', err);
+    console.error('[Gloss BG] 下载任务异常:', err);
     await chrome.storage.local.set({
       _dictStatus: 'failed',
-      _dictError: err.message || String(err)
+      _dictError: err.message || String(err),
+      _dictProgress: null
     });
     chrome.alarms.clear('dictKeepAlive');
   });
 
   return { success: true, started: true };
+}
+
+async function cancelDictionaryDownload() {
+  console.log('[Gloss BG] 取消下载');
+  downloadCancelled = true;
+  chrome.alarms.clear('dictKeepAlive');
+  await chrome.storage.local.set({
+    _dictStatus: 'not_installed',
+    _dictProgress: null,
+    _dictError: '已取消',
+    _dictBytes: 0,
+    _dictBytesTotal: 0,
+    _dictInstalled: false,
+    _dictCount: 0
+  });
+  return { success: true };
 }
 
 async function runDictionaryDownload() {
@@ -214,14 +251,14 @@ async function runDictionaryDownload() {
     if (r._dictBaseUrl && r._dictBaseUrl.trim()) {
       const val = r._dictBaseUrl.trim();
       if (val === 'local' || val.startsWith('local://')) isLocal = true;
-      else {
-        baseUrl = val;
-        if (!baseUrl.endsWith('/')) baseUrl += '/';
-      }
+      else { baseUrl = val; if (!baseUrl.endsWith('/')) baseUrl += '/'; }
     }
   } catch (e) {}
 
+  console.log('[Gloss BG] 下载模式: ' + (isLocal ? '本地' : 'CDN'));
+
   await dbDestroy();
+  await new Promise(r => setTimeout(r, 300));
   dictInstalledCache = null;
 
   let totalLoaded = 0;
@@ -229,22 +266,21 @@ async function runDictionaryDownload() {
   let totalBytes = 0;
   const startTime = Date.now();
 
-  for (let start = DICT_FILE_START; start <= DICT_FILE_END; start += BATCH_SIZE) {
-    const end = Math.min(start + BATCH_SIZE - 1, DICT_FILE_END);
-    const promises = [];
-    for (let i = start; i <= end; i++) promises.push(downloadOneFile(baseUrl, i, isLocal));
-    const results = await Promise.all(promises);
-
-    for (const r of results) {
-      if (r.count > 0) totalLoaded += r.count;
-      if (!r.ok) failed++;
-      totalBytes += r.bytes || 0;
+  for (let i = DICT_PART_START; i <= DICT_PART_END; i++) {
+    if (downloadCancelled) {
+      console.log('[Gloss BG] 下载已取消');
+      return;
     }
+
+    const r = await downloadPartFile(baseUrl, i, isLocal);
+    if (r.count > 0) totalLoaded += r.count;
+    if (!r.ok) failed++;
+    totalBytes += r.bytes || 0;
 
     await chrome.storage.local.set({
       _dictProgress: {
-        current: end,
-        total: DICT_FILE_END,
+        current: i,
+        total: DICT_PART_END,
         loaded: totalLoaded,
         failed,
         bytes: totalBytes,
@@ -252,6 +288,42 @@ async function runDictionaryDownload() {
       },
       _dictBytes: totalBytes
     });
+  }
+
+  if (downloadCancelled) {
+    console.log('[Gloss BG] 下载已取消');
+    return;
+  }
+
+  // 【新增】全部失败检测
+  if (totalLoaded === 0) {
+    console.warn('[Gloss BG] 全部下载失败，0 词条');
+    await chrome.storage.local.set({
+      _dictStatus: 'failed',
+      _dictError: '所有文件下载失败（CDN 未就绪或网络问题）',
+      _dictProgress: null,
+      _dictInstalled: false,
+      _dictCount: 0
+    });
+    chrome.alarms.clear('dictKeepAlive');
+    return;
+  }
+
+  // 写入验证
+  const verifyHits = await verifyDictWrite();
+  console.log('[Gloss BG] 写入验证: ' + verifyHits + ' 个探针命中');
+
+  if (verifyHits === 0) {
+    console.warn('[Gloss BG] 下载完成但写入验证失败');
+    await chrome.storage.local.set({
+      _dictStatus: 'failed',
+      _dictError: 'IndexedDB 写入失败',
+      _dictProgress: null,
+      _dictInstalled: false,
+      _dictCount: 0
+    });
+    chrome.alarms.clear('dictKeepAlive');
+    return;
   }
 
   await chrome.storage.local.set({
@@ -265,20 +337,38 @@ async function runDictionaryDownload() {
     _dictBytesTotal: totalBytes
   });
 
-
-  dictInstalledCache = totalLoaded > 0;
-
+  dictInstalledCache = true;
   chrome.alarms.clear('dictKeepAlive');
+
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log('[Gloss BG] 词典下载完成: ' + totalLoaded + ' 词条, ' + (totalBytes / 1024 / 1024).toFixed(1) + ' MB');
+  console.log('[Gloss BG] 词典下载完成: ' + totalLoaded + ' 词条, ' + (totalBytes / 1024 / 1024).toFixed(1) + ' MB, 耗时 ' + elapsed + 's');
 }
 
-async function downloadOneFile(baseUrl, num, isLocal) {
-  const fileName = String(num).padStart(4, '0') + '.json';
+async function verifyDictWrite() {
+  const probes = ['a', 'i', 'in', 'is', 'to', 'the', 'and', 'you', 'of', 'that'];
+  let hit = 0;
+  for (const p of probes) {
+    try {
+      const r = await dbGet(p);
+      if (r) hit++;
+    } catch (e) {}
+  }
+  return hit;
+}
+
+async function downloadPartFile(baseUrl, partNum, isLocal) {
+  const fileName = 'part_' + String(partNum).padStart(2, '0') + '.json';
   try {
-    const url = isLocal ? chrome.runtime.getURL('dict/' + fileName) : (baseUrl + fileName);
+    const url = isLocal
+      ? chrome.runtime.getURL('dict-parts/' + fileName)
+      : (baseUrl + fileName);
+
+    console.log('[Gloss BG] 下载 ' + fileName);
     const resp = await fetch(url);
-    if (!resp.ok) return { ok: false, count: 0, bytes: 0 };
+    if (!resp.ok) {
+      console.warn('[Gloss BG] ' + fileName + ' HTTP ' + resp.status);
+      return { ok: false, count: 0, bytes: 0 };
+    }
 
     const text = await resp.text();
     if (!text) return { ok: false, count: 0, bytes: 0 };
@@ -292,15 +382,25 @@ async function downloadOneFile(baseUrl, num, isLocal) {
       try {
         const entry = JSON.parse(trimmed);
         if (!entry || !entry.word) continue;
-        const key = entry.word.toLowerCase();
-        entries.push([key, entry]);
-        if (entry.sw && entry.sw !== key) entries.push([entry.sw, entry]);
+        entries.push([entry.word.toLowerCase(), entry]);
       } catch (e) {}
     }
 
-    if (entries.length > 0) await dbPutBatch(entries);
+    let writeFailures = 0;
+    for (let i = 0; i < entries.length; i += WRITE_CHUNK) {
+      if (downloadCancelled) break;
+      try {
+        await dbPutBatch(entries.slice(i, i + WRITE_CHUNK));
+      } catch (e) {
+        writeFailures++;
+        console.warn('[Gloss BG] ' + fileName + ' 写入块 ' + i + ' 失败:', e.message);
+      }
+    }
+
+    console.log('[Gloss BG] ' + fileName + ' 完成: ' + entries.length + ' 词条, 写入失败 ' + writeFailures + ' 块');
     return { ok: true, count: entries.length, bytes };
   } catch (err) {
+    console.warn('[Gloss BG] ' + fileName + ' 失败:', err.message);
     return { ok: false, count: 0, bytes: 0, error: err.message };
   }
 }
@@ -353,13 +453,15 @@ function groupDefinitionsByPos(rawLines) {
 }
 
 function buildMeaningsFromGroups(groups) {
-  return groups.map(g => ({ partOfSpeech: g.pos || '', definitions: [{ definition: g.items.join('；') }] }));
+  return groups.map(g => ({
+    partOfSpeech: g.pos || '',
+    definitions: [{ definition: g.items.join('；') }]
+  }));
 }
 
 async function lookupWordLocal(word) {
   const lower = word.toLowerCase();
-  const compressed = lower.replace(/[\s\-_]/g, '');
-  let entry = await dbGet(lower) || await dbGet(compressed);
+  let entry = await dbGet(lower);
 
   if (!entry && lower.endsWith('s')) entry = await dbGet(lower.slice(0, -1));
   if (!entry && lower.endsWith('es')) entry = await dbGet(lower.slice(0, -2));
@@ -379,7 +481,7 @@ async function lookupWordLocal(word) {
 }
 
 // ============================================================
-// 有道
+// 有道在线查词
 // ============================================================
 function extractYoudaoPhonetic(json) {
   let uk = '', us = '';
@@ -542,14 +644,20 @@ async function lookupWordFreeDict(word) {
         if (d.definition) defs.push(d.definition);
         if (d.example && allExamples.length < 3) allExamples.push({ en: d.example, zh: '' });
       }
-      if (defs.length) meanings.push({ partOfSpeech: m.partOfSpeech || '', definitions: [{ definition: defs.join('；') }] });
+      if (defs.length) meanings.push({
+        partOfSpeech: m.partOfSpeech || '',
+        definitions: [{ definition: defs.join('；') }]
+      });
     }
     if (meanings.length === 0) return { notFound: true };
     return {
       data: {
         word: entry.word || word,
         phonetic: phoneticText ? '/' + phoneticText + '/' : '',
-        audio: audioUrl, meanings, examples: allExamples, phrases: []
+        audio: audioUrl,
+        meanings,
+        examples: allExamples,
+        phrases: []
       }
     };
   } catch (err) {
@@ -573,7 +681,7 @@ async function lookupWordOnline(word) {
 // 统一查询入口
 // ============================================================
 async function queryByMode(word, mode) {
-  const installed = await isDictInstalled(); 
+  const installed = await isDictInstalled();
 
   if (mode === 'online') {
     const r = await lookupWordOnline(word);
@@ -711,37 +819,8 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
 
   if (message.type === 'DICT_STATUS') {
     (async () => {
-      try {
-        const real = await getDictRealStatus();
-        const r = await chrome.storage.local.get(['_dictStatus', '_dictProgress', '_dictError', '_dictBytes', '_dictBytesTotal']);
-        if (real.installed && r._dictStatus !== 'installed') {
-          await chrome.storage.local.set({
-            _dictStatus: 'installed',
-            _dictInstalled: true,
-            _dictCount: real.count
-          });
-        }
-        if (!real.installed && r._dictStatus === 'installed') {
-          await chrome.storage.local.set({
-            _dictStatus: 'not_installed',
-            _dictInstalled: false,
-            _dictCount: 0,
-            _dictBytesTotal: 0,
-            _dictBytes: 0
-          });
-        }
-        sendResponse({
-          installed: real.installed,
-          count: real.count,
-          status: real.installed ? 'installed' : (r._dictStatus || 'not_installed'),
-          progress: r._dictProgress || null,
-          error: r._dictError || null,
-          bytes: r._dictBytes || 0,
-          bytesTotal: r._dictBytesTotal || 0
-        });
-      } catch (err) {
-        sendResponse({ installed: false, count: 0, error: err.message });
-      }
+      try { sendResponse(await getDictRealStatus()); }
+      catch (err) { sendResponse({ installed: false, count: 0, status: 'not_installed', error: err.message }); }
     })();
     return true;
   }
@@ -751,31 +830,37 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     return true;
   }
 
-if (message.type === 'DICT_CLEAR') {
-  (async () => {
-    try {
-      console.log('[Gloss BG] 开始清除词典...');
-      await dbDestroy();
-      dictInstalledCache = false;
-      await chrome.storage.local.set({
-        _dictInstalled: false,
-        _dictCount: 0,
-        _dictInstalledAt: 0,
-        _dictStatus: 'not_installed',
-        _dictProgress: null,
-        _dictError: null,
-        _dictBytes: 0,
-        _dictBytesTotal: 0
-      });
-      console.log('[Gloss BG] 词典已清除');
-      sendResponse({ success: true });
-    } catch (err) {
-      console.error('[Gloss BG] 清除失败:', err);
-      sendResponse({ success: false, error: err.message });
-    }
-  })();
-  return true;
-}
+  if (message.type === 'DICT_CANCEL') {
+    cancelDictionaryDownload().then(sendResponse).catch(err => sendResponse({ success: false, error: err.message }));
+    return true;
+  }
+
+  if (message.type === 'DICT_CLEAR') {
+    (async () => {
+      try {
+        console.log('[Gloss BG] 开始清除词典...');
+        downloadCancelled = true;
+        await dbDestroy();
+        dictInstalledCache = false;
+        await chrome.storage.local.set({
+          _dictInstalled: false,
+          _dictCount: 0,
+          _dictInstalledAt: 0,
+          _dictStatus: 'not_installed',
+          _dictProgress: null,
+          _dictError: null,
+          _dictBytes: 0,
+          _dictBytesTotal: 0
+        });
+        console.log('[Gloss BG] 词典已清除');
+        sendResponse({ success: true });
+      } catch (err) {
+        console.error('[Gloss BG] 清除失败:', err);
+        sendResponse({ success: false, error: err.message });
+      }
+    })();
+    return true;
+  }
 
   if (message.type === 'LOOKUP_WORD') {
     (async () => {
