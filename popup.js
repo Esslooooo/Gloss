@@ -169,7 +169,7 @@ function renderList() {
   if (!listEl) return;
   const words = getFilteredWords();
   if (words.length === 0) {
-    listEl.innerHTML = '<div class="empty-list">还没有单词<br>双击网页上的单词即可收录</div>';
+    listEl.innerHTML = '<div class="empty-list">还没有单词<br>双击网页上的英文单词即可收录</div>';
     return;
   }
   listEl.innerHTML = words.map(item => {
@@ -355,7 +355,7 @@ function renderClips() {
   if (!body) return;
   const clips = state.clips || [];
   if (clips.length === 0) {
-    body.innerHTML = '<div class="empty-clips">还没有摘抄<br><br>拖动划选句子<br>点击「摘抄此句」即可收录</div>';
+    body.innerHTML = '<div class="empty-clips">还没有摘抄<br><br>拖动划选网页上的英文句子<br>点击「摘抄此句」即可收录</div>';
     return;
   }
   body.innerHTML = clips.map(c => {
@@ -634,8 +634,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
 });
 
 on('downloadDictBtn', 'click', async () => {
-  await chrome.storage.local.set({ _dictBaseUrl: 'local' });
-  // await chrome.storage.local.set({ _dictBaseUrl: '' });
+  // 从 CDN 拉取词典（默认走 background.js 里的 DEFAULT_DICT_BASE）
+  await chrome.storage.local.set({ _dictBaseUrl: '' });
 
   chrome.runtime.sendMessage({ type: 'DICT_DOWNLOAD' }, function() {
     if (chrome.runtime.lastError) console.warn('[Gloss Popup] 启动下载失败');
