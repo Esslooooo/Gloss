@@ -16,7 +16,6 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   }
 
   try {
-    // 停止上一个音频
     if (currentAudio) {
       try { currentAudio.pause(); } catch (e) {}
       currentAudio = null;
@@ -28,10 +27,10 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
     const playPromise = currentAudio.play();
     if (playPromise && playPromise.then) {
       playPromise.then(function() {
-        console.log('[Gloss Offscreen] ✅ 播放成功');
+        console.log('[Gloss Offscreen] 播放成功');
         sendResponse({ success: true });
       }).catch(function(err) {
-        console.warn('[Gloss Offscreen] ❌ 播放失败:', err.message);
+        console.warn('[Gloss Offscreen] 播放失败:', err.message);
         sendResponse({ success: false, error: err.message });
       });
     } else {

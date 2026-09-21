@@ -9,11 +9,18 @@
     "https://aidemo.youdao.com/*",
     "https://fanyi.youdao.com/*",
     "https://api.mymemory.translated.net/*",
-    "https://api.dictionaryapi.dev/*"
+    "https://api.dictionaryapi.dev/*",
+    "https://fastly.jsdelivr.net/*",
+    "https://cdn.jsdelivr.net/*",
+    "file:///*"
   ],
   "content_scripts": [
     {
-      "matches": ["http://*/*", "https://*/*"],
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
@@ -24,8 +31,12 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["dict/*.json"],
-      "matches": ["http://*/*", "https://*/*"]
+      "resources": ["dict/*.json", "dict-parts/*.json"],
+      "matches": [
+        "http://*/*",
+        "https://*/*",
+        "file:///*"
+      ]
     }
   ],
   "action": {
