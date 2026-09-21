@@ -2,6 +2,7 @@
 // 启用状态
 // ============================================================
 let wcxEnabled = true;
+let wcxRecordWords = true;
 
 async function checkEnabled() {
   if (!isExtensionAlive()) return;
@@ -20,10 +21,21 @@ async function checkEnabled() {
   }
 }
 
+async function loadRecordWordsSetting() {
+  try {
+    const r = await chrome.storage.local.get('_recordWords');
+    wcxRecordWords = r._recordWords !== false;
+    console.log('[Gloss] 生词记录:', wcxRecordWords ? '开启' : '关闭');
+  } catch (e) {}
+}
+
 if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged) {
   chrome.storage.onChanged.addListener(function(changes, area) {
-    if (area === 'local' && (changes._enabled || changes._blacklist)) {
-      checkEnabled();
+    if (area !== 'local') return;
+    if (changes._enabled || changes._blacklist) checkEnabled();
+    if (changes._recordWords) {
+      wcxRecordWords = changes._recordWords.newValue !== false;
+      console.log('[Gloss] 生词记录已切换:', wcxRecordWords ? '开启' : '关闭');
     }
   });
 }
@@ -46,6 +58,7 @@ function wakeUpBackground() {
 }
 wakeUpBackground();
 checkEnabled();
+loadRecordWordsSetting();
 
 console.log('[Gloss] content.js 已加载');
 
@@ -207,11 +220,6 @@ function getAnchorRect() {
   }
 }
 
-// ============================================================
-// 【关键修改】智能定位
-// 优先级：右 → 左 → 下 → 上
-// 左侧显示时用 right 定位，宽度变化向左长，永不遮挡单词
-// ============================================================
 function wcxUpdatePosition(rect, el) {
   if (!el || !rect) return;
 
@@ -229,25 +237,17 @@ function wcxUpdatePosition(rect, el) {
 
   let mode;
 
-  if (spaceRight >= w + gap) {
-    mode = 'right';
-  } else if (spaceLeft >= w + gap) {
-    mode = 'left';
-  } else if (spaceBelow >= h + gap) {
-    mode = 'below';
-  } else if (spaceAbove >= h + gap) {
-    mode = 'above';
-  } else {
+  if (spaceRight >= w + gap) mode = 'right';
+  else if (spaceLeft >= w + gap) mode = 'left';
+  else if (spaceBelow >= h + gap) mode = 'below';
+  else if (spaceAbove >= h + gap) mode = 'above';
+  else {
     const maxH = Math.max(spaceRight, spaceLeft);
     const maxV = Math.max(spaceBelow, spaceAbove);
-    if (maxH >= maxV) {
-      mode = spaceRight >= spaceLeft ? 'right' : 'left';
-    } else {
-      mode = spaceBelow >= spaceAbove ? 'below' : 'above';
-    }
+    if (maxH >= maxV) mode = spaceRight >= spaceLeft ? 'right' : 'left';
+    else mode = spaceBelow >= spaceAbove ? 'below' : 'above';
   }
 
-  // 清除所有定位属性，避免冲突
   el.style.left = '';
   el.style.right = '';
   el.style.top = '';
@@ -257,7 +257,6 @@ function wcxUpdatePosition(rect, el) {
     el.style.left = (rect.right + gap) + 'px';
     el.style.top = Math.max(edge, Math.min(vh - h - edge, rect.top)) + 'px';
   } else if (mode === 'left') {
-    // 【核心】用 right 定位，弹框宽度变化时向左扩展，永不遮挡单词
     el.style.right = (vw - rect.left + gap) + 'px';
     el.style.top = Math.max(edge, Math.min(vh - h - edge, rect.top)) + 'px';
   } else if (mode === 'below') {
@@ -364,7 +363,7 @@ function wcxShowSentencePopup(rect, sentence) {
   wcxSentencePopup.style.zIndex = '999999';
 
   ['mousedown', 'mouseup', 'click', 'dblclick'].forEach(evt => {
-    wcxSentencePopup.addEventListener(evt, e => e.stopPropagation());
+    wcxSentencePopup.addEventListener(evt, (e) => e.stopPropagation());
   });
 
   document.documentElement.appendChild(wcxSentencePopup);
@@ -404,14 +403,13 @@ function updateSentenceTranslation(translation, sourceText) {
     e.stopPropagation();
     const ok = await saveClip(sourceText, translation);
     clipBtn.classList.add('clipped');
-    clipBtn.querySelector('span').textContent = ok === 'exists' ? '已存在' : '已摘抄';
+    clipBtn.querySelector('span').textContent = ok === 'exists' ? '已存在 ✓' : '已摘抄 ✓';
     clipBtn.disabled = true;
   });
 
   actionsEl.appendChild(clipBtn);
   resultEl.parentNode.appendChild(actionsEl);
 
-  // 内容变长后重新调整位置
   setTimeout(() => {
     if (wcxSentencePopup && wcxAnchor) {
       const rect = getAnchorRect();
@@ -627,7 +625,11 @@ async function wcxDoLookup(word) {
 
   const data = response.data;
   const isOnline = data.source === 'online';
-  saveToVocabulary(word, data);
+
+  // 只有开启记录时才保存生词
+  if (wcxRecordWords) {
+    saveToVocabulary(word, data);
+  }
 
   let phoneticHtml = '';
   if (data.phonetic) phoneticHtml += '<span class="wcx-phonetic-text">' + escapeHtml(data.phonetic) + '</span>';
@@ -642,10 +644,14 @@ async function wcxDoLookup(word) {
     ? '<span class="wcx-source online">在线</span>'
     : '<span class="wcx-source local">本地</span>';
 
+  const savedLabel = wcxRecordWords
+    ? '<span class="wcx-status wcx-saved">已加入生词本 ✓</span>'
+    : '<span class="wcx-status wcx-not-saved">未记录</span>';
+
   wcxPopup.innerHTML =
     '<div class="wcx-header">' +
       '<strong>' + escapeHtml(word) + '</strong>' +
-      '<div class="wcx-header-right">' + sourceLabel + '<span class="wcx-status wcx-saved">已加入生词本 ✓</span></div>' +
+      '<div class="wcx-header-right">' + sourceLabel + savedLabel + '</div>' +
     '</div>' +
     phoneticBlock +
     '<div class="wcx-body">' + meaningsHtml + phrasesHtml + examplesHtml + '</div>';
@@ -668,6 +674,10 @@ async function wcxDoLookup(word) {
 }
 
 async function saveToVocabulary(word, entry) {
+  if (!wcxRecordWords) {
+    console.log('[Gloss] 生词记录已关闭，跳过:', word);
+    return;
+  }
   if (!isExtensionAlive()) return;
   try {
     const result = await chrome.storage.local.get('vocabulary');

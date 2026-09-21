@@ -22,6 +22,7 @@
       </svg>
     </button>
   </div>
+
   <div class="searchbar">
     <svg class="search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="11" cy="11" r="8"></circle>
@@ -29,12 +30,20 @@
     </svg>
     <input type="text" id="searchBox" placeholder="搜索">
   </div>
-  <div class="filters" id="filters">
-    <button class="filter active" data-filter="all">全部</button>
-    <button class="filter" data-filter="review">待复习</button>
-    <button class="filter" data-filter="starred">收藏</button>
-    <button class="filter" data-filter="mastered">已掌握</button>
+
+  <div class="filters-row">
+    <div class="filters" id="filters">
+      <button class="filter active" data-filter="all">全部</button>
+      <button class="filter" data-filter="review">待复习</button>
+      <button class="filter" data-filter="starred">收藏</button>
+      <button class="filter" data-filter="mastered">已掌握</button>
+    </div>
+    <button class="record-pill on" id="recordToggle" title="点击暂停记录生词">
+      <span class="record-dot"></span>
+      <span class="record-text">记录中</span>
+    </button>
   </div>
+
   <div class="list" id="wordList"></div>
 </div>
 
@@ -85,10 +94,10 @@
         <button class="btn-secondary" id="skipBtn">下一个</button>
       </div>
       <div class="review-grades" id="reviewGrades">
-        <button class="grade" data-q="0"></span>忘记<small>1</small></button>
-        <button class="grade" data-q="3"></span>模糊<small>2</small></button>
-        <button class="grade" data-q="4"></span>记得<small>3</small></button>
-        <button class="grade" data-q="5"></span>秒答<small>4</small></button>
+        <button class="grade" data-q="0"><span>😵</span>忘了<small>1</small></button>
+        <button class="grade" data-q="3"><span>🤔</span>模糊<small>2</small></button>
+        <button class="grade" data-q="4"><span>😊</span>记得<small>3</small></button>
+        <button class="grade" data-q="5"><span>✨</span>秒答<small>4</small></button>
       </div>
     </div>
   </div>
@@ -134,11 +143,22 @@
         <div class="progress-bar"><div class="progress-fill" id="dictProgressFill"></div></div>
         <div class="progress-text" id="dictProgressText">0 / 0</div>
       </div>
-        <div id="dictActions" style="margin-top:10px;">
+      <div id="dictActions" style="margin-top:10px;">
         <button class="settings-btn" id="downloadDictBtn">下载本地词典</button>
         <button class="settings-btn danger" id="cancelDictBtn" style="display:none;">取消下载</button>
         <button class="settings-btn danger" id="clearDictBtn" style="display:none;">清除本地词典</button>
-        </div>
+      </div>
+    </div>
+    <div class="settings-group">
+      <div class="settings-label">存储</div>
+      <div class="storage-row">
+        <span class="storage-label">已用存储</span>
+        <span class="storage-value" id="storageUsageValue">-</span>
+      </div>
+      <div class="storage-bar">
+        <div class="storage-fill" id="storageFill"></div>
+      </div>
+      <div class="storage-hint" id="storageHint"></div>
     </div>
     <div class="settings-group">
       <div class="settings-label">在线词典</div>

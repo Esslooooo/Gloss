@@ -831,3 +831,59 @@ loadData()
     console.log('[Gloss Popup] 初始化完成');
   })
   .catch((err) => { console.error('[Gloss Popup] 初始化失败:', err); });
+
+  // ============================================================
+// 生词记录开关
+// ============================================================
+async function initRecordToggle() {
+  const btn = document.getElementById('recordToggle');
+  if (!btn) return;
+
+  const dotEl = btn.querySelector('.record-dot');
+  const textEl = btn.querySelector('.record-text');
+
+  function updateUI(recordWords) {
+    if (recordWords) {
+      btn.classList.remove('off');
+      btn.classList.add('on');
+      btn.title = '点击暂停记录生词';
+      textEl.textContent = '记录中';
+    } else {
+      btn.classList.remove('on');
+      btn.classList.add('off');
+      btn.title = '点击开启记录生词';
+      textEl.textContent = '不记录';
+    }
+  }
+
+  // 读取当前状态
+  try {
+    const r = await chrome.storage.local.get('_recordWords');
+    const recordWords = r._recordWords !== false;
+    updateUI(recordWords);
+  } catch (e) {}
+
+  // 点击切换
+  btn.addEventListener('click', async (e) => {
+    e.stopPropagation();
+    try {
+      const r = await chrome.storage.local.get('_recordWords');
+      const current = r._recordWords !== false;
+      const next = !current;
+      await chrome.storage.local.set({ _recordWords: next });
+      updateUI(next);
+      console.log('[Gloss Popup] 生词记录:', next ? '开启' : '关闭');
+    } catch (e) {
+      console.error('[Gloss Popup] 切换失败:', e);
+    }
+  });
+
+  // 监听外部变化（虽然一般不会，但保险）
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes._recordWords) {
+      updateUI(changes._recordWords.newValue !== false);
+    }
+  });
+}
+
+initRecordToggle();
