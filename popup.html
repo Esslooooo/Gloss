@@ -62,8 +62,15 @@
 
 <div class="view" id="view-clips">
   <div class="titlebar">
-    <div class="title">摘抄</div>
     <div style="width:32px"></div>
+    <div class="title">摘抄</div>
+    <button class="icon-btn" id="exportClipsBtn" title="导出摘抄">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+        <polyline points="7 10 12 15 17 10"></polyline>
+        <line x1="12" y1="15" x2="12" y2="3"></line>
+      </svg>
+    </button>
   </div>
   <div class="clips-body" id="clipsBody"></div>
 </div>
@@ -171,8 +178,8 @@
     </div>
     <div class="settings-group">
       <div class="settings-label">数据管理</div>
-      <button class="settings-btn" id="exportBtn">导出 JSON</button>
-      <button class="settings-btn" id="importBtn">导入 JSON</button>
+      <button class="settings-btn" id="exportBtn">导出词库 JSON</button>
+      <button class="settings-btn" id="importBtn">导入词库 JSON</button>
       <input type="file" id="importFile" accept=".json" style="display:none">
     </div>
   </div>
@@ -225,6 +232,27 @@
       <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
     </svg>
     <span>删除</span>
+  </button>
+</div>
+
+<div class="export-menu" id="exportMenu">
+  <button data-format="md">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+    </svg>
+    <span>Markdown (.md)</span>
+  </button>
+  <button data-format="txt">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+      <polyline points="14 2 14 8 20 8"></polyline>
+      <line x1="16" y1="13" x2="8" y2="13"></line>
+      <line x1="16" y1="17" x2="8" y2="17"></line>
+    </svg>
+    <span>纯文本 (.txt)</span>
   </button>
 </div>
 

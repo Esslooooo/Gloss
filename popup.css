@@ -20,9 +20,6 @@ body {
   overflow: hidden;
 }
 
-/* ============================================================
-   视图容器
-   ============================================================ */
 .view {
   display: none;
   flex: 1 1 auto;
@@ -30,13 +27,8 @@ body {
   flex-direction: column;
   overflow: hidden;
 }
-.view.active {
-  display: flex;
-}
+.view.active { display: flex; }
 
-/* ============================================================
-   标题栏
-   ============================================================ */
 .titlebar {
   height: 44px;
   min-height: 44px;
@@ -94,13 +86,8 @@ body {
 .power-btn:hover { background: rgba(0,0,0,0.06); }
 .power-btn.active svg { color: #34c759; }
 .power-btn.active:hover { background: rgba(52, 199, 89, 0.1); }
-.power-btn.active {
-  filter: drop-shadow(0 0 3px rgba(52, 199, 89, 0.4));
-}
+.power-btn.active { filter: drop-shadow(0 0 3px rgba(52, 199, 89, 0.4)); }
 
-/* ============================================================
-   搜索栏
-   ============================================================ */
 .searchbar {
   position: relative;
   margin: 10px 12px 8px;
@@ -134,17 +121,14 @@ body {
 }
 .searchbar input::placeholder { color: #86868b; }
 
-/* ============================================================
-   筛选行 + 记录胶囊
-   ============================================================ */
 .filters-row {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 10px 12px 8px;
+  padding: 14px 12px 10px;
   background: #ffffff;
   flex-shrink: 0;
-  height: 44px;
+  min-height: 44px;
   box-sizing: border-box;
 }
 
@@ -160,7 +144,7 @@ body {
 
 .filter {
   flex-shrink: 0;
-  padding: 5px 11px;
+  padding: 4px 10px;
   border: none;
   background: transparent;
   font-size: 12px;
@@ -170,6 +154,7 @@ body {
   transition: all 0.15s;
   font-family: inherit;
   font-weight: 500;
+  line-height: 1.4;
 }
 .filter:hover { background: rgba(0,0,0,0.04); }
 .filter.active { background: #1d1d1f; color: #ffffff; }
@@ -178,11 +163,11 @@ body {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  height: 26px;
-  padding: 0 10px;
-  border-radius: 13px;
+  height: 24px;
+  padding: 0 9px;
+  border-radius: 12px;
   border: none;
-  font-size: 11.5px;
+  font-size: 11px;
   font-weight: 500;
   cursor: pointer;
   font-family: inherit;
@@ -190,35 +175,27 @@ body {
   white-space: nowrap;
   flex-shrink: 0;
   margin-left: auto;
+  line-height: 1;
 }
-.record-pill.on {
-  background: #ecfdf5;
-  color: #059669;
-}
+.record-pill.on { background: #ecfdf5; color: #059669; }
 .record-pill.on:hover { background: #d1fae5; }
 .record-pill.on .record-dot {
   background: #34c759;
   box-shadow: 0 0 4px rgba(52, 199, 89, 0.7);
 }
-.record-pill.off {
-  background: #f1f5f9;
-  color: #64748b;
-}
+.record-pill.off { background: #f1f5f9; color: #64748b; }
 .record-pill.off:hover { background: #e2e8f0; }
 .record-pill.off .record-dot { background: #cbd5e1; }
 .record-pill:active { transform: scale(0.96); }
 
 .record-dot {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
   border-radius: 50%;
   flex-shrink: 0;
   transition: background 0.15s;
 }
 
-/* ============================================================
-   词库列表
-   ============================================================ */
 .list {
   flex: 1 1 auto;
   min-height: 0;
@@ -288,9 +265,6 @@ body {
   line-height: 1.6;
 }
 
-/* ============================================================
-   详情
-   ============================================================ */
 .detail-content {
   flex: 1;
   overflow-y: auto;
@@ -500,9 +474,6 @@ body {
 .btn-secondary:hover { background: #f5f5f7; }
 .btn-secondary:active { transform: scale(0.98); }
 
-/* ============================================================
-   复习
-   ============================================================ */
 .review-body {
   flex: 1;
   overflow-y: auto;
@@ -624,16 +595,10 @@ body {
   gap: 2px;
 }
 .grade span { font-size: 18px; }
-.grade small {
-  font-size: 10px;
-  color: #86868b;
-}
+.grade small { font-size: 10px; color: #86868b; }
 .grade:hover { background: #f5f5f7; transform: translateY(-1px); }
 .grade:active { transform: scale(0.96); }
 
-/* ============================================================
-   设置
-   ============================================================ */
 .settings-content {
   flex: 1;
   overflow-y: auto;
@@ -684,13 +649,8 @@ body {
   transition: background 0.15s;
 }
 .settings-btn:hover { background: #f5f5f7; }
-.settings-btn.danger {
-  color: #ff3b30;
-  border-color: #ffd0cc;
-}
-.settings-btn.danger:hover {
-  background: #fff5f4;
-}
+.settings-btn.danger { color: #ff3b30; border-color: #ffd0cc; }
+.settings-btn.danger:hover { background: #fff5f4; }
 
 .settings-hint {
   font-size: 12px;
@@ -699,9 +659,6 @@ body {
   line-height: 1.5;
 }
 
-/* ============================================================
-   底部导航
-   ============================================================ */
 .tabbar {
   height: 52px;
   min-height: 52px;
@@ -727,10 +684,7 @@ body {
   position: relative;
   padding: 0;
 }
-.tabbar .tab svg {
-  width: 20px;
-  height: 20px;
-}
+.tabbar .tab svg { width: 20px; height: 20px; }
 .tabbar .tab.active { color: #0071e3; }
 .tabbar .tab .badge {
   position: absolute;
@@ -752,9 +706,6 @@ body {
 }
 .tabbar .tab .badge.hidden { display: none; }
 
-/* ============================================================
-   右键菜单
-   ============================================================ */
 .context-menu {
   position: fixed;
   z-index: 99999;
@@ -789,9 +740,38 @@ body {
 .context-menu button.danger svg { color: #ff3b30; }
 .context-menu button.danger:hover { background: #ffe5e3; }
 
-/* ============================================================
-   摘抄视图
-   ============================================================ */
+/* 导出菜单 */
+.export-menu {
+  position: fixed;
+  z-index: 99999;
+  background: #ffffff;
+  border: 1px solid #e5e5e7;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.12), 0 2px 6px rgba(0,0,0,0.06);
+  padding: 4px;
+  min-width: 180px;
+  display: none;
+}
+.export-menu.show { display: block; }
+.export-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  text-align: left;
+  font-size: 13px;
+  color: #1d1d1f;
+  cursor: pointer;
+  border-radius: 6px;
+  font-family: inherit;
+  transition: background 0.1s;
+}
+.export-menu button:hover { background: #f0f0f2; }
+.export-menu button svg { width: 14px; height: 14px; color: #86868b; flex-shrink: 0; }
+
 .clips-body {
   flex: 1;
   overflow-y: auto;
@@ -843,10 +823,7 @@ body {
   white-space: nowrap;
   max-width: 200px;
 }
-.clip-card .clip-actions {
-  display: flex;
-  gap: 6px;
-}
+.clip-card .clip-actions { display: flex; gap: 6px; }
 .clip-card .clip-action-btn {
   width: 24px;
   height: 24px;
@@ -861,18 +838,9 @@ body {
   padding: 0;
   transition: all 0.15s;
 }
-.clip-card .clip-action-btn:hover {
-  background: rgba(0,0,0,0.06);
-  color: #1d1d1f;
-}
-.clip-card .clip-action-btn.danger:hover {
-  background: #ffe5e3;
-  color: #ff3b30;
-}
-.clip-card .clip-action-btn svg {
-  width: 13px;
-  height: 13px;
-}
+.clip-card .clip-action-btn:hover { background: rgba(0,0,0,0.06); color: #1d1d1f; }
+.clip-card .clip-action-btn.danger:hover { background: #ffe5e3; color: #ff3b30; }
+.clip-card .clip-action-btn svg { width: 13px; height: 13px; }
 .clip-card .clip-note {
   margin-top: 8px;
   padding: 8px 10px;
@@ -891,9 +859,6 @@ body {
   line-height: 1.6;
 }
 
-/* ============================================================
-   黑名单 / 词典状态 / 存储
-   ============================================================ */
 .site-domain {
   font-size: 13px;
   color: #1d1d1f;
@@ -952,10 +917,7 @@ body {
   justify-content: center;
   padding: 0;
 }
-.blacklist-remove:hover {
-  background: #ffe5e3;
-  color: #ff3b30;
-}
+.blacklist-remove:hover { background: #ffe5e3; color: #ff3b30; }
 
 .dict-status-text {
   font-size: 13px;
@@ -964,13 +926,8 @@ body {
   background: #f5f5f7;
   border-radius: 8px;
 }
-.dict-status-text.installed {
-  color: #34c759;
-  background: #ecfdf5;
-}
-.dict-status-text.missing {
-  color: #86868b;
-}
+.dict-status-text.installed { color: #34c759; background: #ecfdf5; }
+.dict-status-text.missing { color: #86868b; }
 
 .progress-bar {
   width: 100%;

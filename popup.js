@@ -887,3 +887,163 @@ async function initRecordToggle() {
 }
 
 initRecordToggle();
+
+// ============================================================
+// 摘抄导出
+// ============================================================
+function padZero(n) { return n < 10 ? '0' + n : '' + n; }
+
+function formatDate(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + padZero(d.getMonth() + 1) + '-' + padZero(d.getDate());
+}
+
+function formatDateTime(ts) {
+  if (!ts) return '';
+  const d = new Date(ts);
+  return d.getFullYear() + '-' + padZero(d.getMonth() + 1) + '-' + padZero(d.getDate()) +
+    ' ' + padZero(d.getHours()) + ':' + padZero(d.getMinutes()) + ':' + padZero(d.getSeconds());
+}
+
+function buildMarkdown(clips) {
+  const now = formatDateTime(Date.now());
+  let md = '# Gloss 摘抄\n\n';
+  md += `导出时间：${now}\n\n`;
+  md += `共 ${clips.length} 条\n\n`;
+  md += '---\n\n';
+
+  clips.forEach((c, i) => {
+    md += `## ${i + 1}\n\n`;
+    md += `> ${c.text}\n\n`;
+    if (c.translation) {
+      md += `**译文**：${c.translation}\n\n`;
+    }
+    const title = c.title || '';
+    const url = c.url || '';
+    if (title && url) {
+      md += `**来源**：[${title}](${url})\n\n`;
+    } else if (url) {
+      md += `**来源**：${url}\n\n`;
+    } else if (title) {
+      md += `**来源**：${title}\n\n`;
+    }
+    md += `**收藏时间**：${formatDate(c.createdAt)}\n\n`;
+    if (c.note) {
+      md += `**笔记**：${c.note}\n\n`;
+    }
+    md += '---\n\n';
+  });
+
+  return md;
+}
+
+function buildTxt(clips) {
+  const now = formatDateTime(Date.now());
+  let txt = 'Gloss 摘抄\n';
+  txt += '============================================================\n';
+  txt += `导出时间：${now}\n`;
+  txt += `共 ${clips.length} 条\n`;
+  txt += '============================================================\n\n';
+
+  clips.forEach((c, i) => {
+    txt += `[${i + 1}]\n\n`;
+    txt += '原文：\n';
+    txt += c.text + '\n\n';
+    if (c.translation) {
+      txt += '译文：\n';
+      txt += c.translation + '\n\n';
+    }
+    if (c.title) {
+      txt += `来源：${c.title}\n`;
+    }
+    if (c.url) {
+      txt += `网址：${c.url}\n`;
+    }
+    txt += `收藏时间：${formatDate(c.createdAt)}\n`;
+    if (c.note) {
+      txt += '\n笔记：\n' + c.note + '\n';
+    }
+    txt += '\n------------------------------------------------------------\n\n';
+  });
+
+  return txt;
+}
+
+async function exportClips(format) {
+  const clips = state.clips || [];
+  if (clips.length === 0) {
+    alert('还没有摘抄可以导出');
+    return;
+  }
+
+  const dateStr = new Date().toISOString().slice(0, 10);
+  let content, filename, mimeType;
+
+  if (format === 'md') {
+    content = buildMarkdown(clips);
+    filename = `gloss-clips-${dateStr}.md`;
+    mimeType = 'text/markdown';
+  } else {
+    content = buildTxt(clips);
+    filename = `gloss-clips-${dateStr}.txt`;
+    mimeType = 'text/plain';
+  }
+
+  const blob = new Blob([content], { type: mimeType + ';charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+
+  try {
+    // 优先用 downloads API，会弹出"另存为"对话框，用户可自选位置
+    if (chrome.downloads && chrome.downloads.download) {
+      const downloadId = await chrome.downloads.download({
+        url: url,
+        filename: filename,
+        saveAs: true
+      });
+      console.log('[Gloss Popup] 导出成功, downloadId:', downloadId);
+    } else {
+      // 兜底：直接触发下载（无"另存为"对话框）
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+    }
+  } catch (e) {
+    console.error('[Gloss Popup] 导出失败:', e);
+    alert('导出失败：' + e.message);
+  }
+
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+
+// 绑定导出按钮
+(function initExportClips() {
+  const btn = document.getElementById('exportClipsBtn');
+  const menu = document.getElementById('exportMenu');
+  if (!btn || !menu) return;
+
+  btn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const rect = btn.getBoundingClientRect();
+    // 显示在按钮下方右侧对齐
+    menu.style.top = (rect.bottom + 4) + 'px';
+    menu.style.right = (window.innerWidth - rect.right) + 'px';
+    menu.classList.add('show');
+  });
+
+  menu.addEventListener('click', (e) => {
+    const item = e.target.closest('button[data-format]');
+    if (!item) return;
+    e.stopPropagation();
+    menu.classList.remove('show');
+    exportClips(item.dataset.format);
+  });
+
+  // 点击其他地方关闭菜单
+  document.addEventListener('click', (e) => {
+    if (menu.classList.contains('show') && !menu.contains(e.target) && e.target !== btn) {
+      menu.classList.remove('show');
+    }
+  });
+})();

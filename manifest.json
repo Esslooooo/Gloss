@@ -3,7 +3,7 @@
   "name": "Gloss",
   "version": "7.0",
   "description": "双击拾词 — 双击网页上的英文单词，秒出释义，自动加入生词本，支持 SM-2 复习",
-  "permissions": ["storage", "unlimitedStorage", "offscreen", "tabs", "alarms"],
+  "permissions": ["storage", "unlimitedStorage", "offscreen", "tabs", "alarms", "downloads"],
   "host_permissions": [
     "https://dict.youdao.com/*",
     "https://aidemo.youdao.com/*",
@@ -11,16 +11,11 @@
     "https://api.mymemory.translated.net/*",
     "https://api.dictionaryapi.dev/*",
     "https://fastly.jsdelivr.net/*",
-    "https://cdn.jsdelivr.net/*",
-    "file:///*"
+    "https://cdn.jsdelivr.net/*"
   ],
   "content_scripts": [
     {
-      "matches": [
-        "http://*/*",
-        "https://*/*",
-        "file:///*"
-      ],
+      "matches": ["http://*/*", "https://*/*", "file:///*"],
       "js": ["content.js"],
       "css": ["content.css"],
       "run_at": "document_idle"
@@ -32,11 +27,7 @@
   "web_accessible_resources": [
     {
       "resources": ["dict/*.json", "dict-parts/*.json"],
-      "matches": [
-        "http://*/*",
-        "https://*/*",
-        "file:///*"
-      ]
+      "matches": ["http://*/*", "https://*/*", "file:///*"]
     }
   ],
   "action": {
