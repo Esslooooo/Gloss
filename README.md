@@ -30,7 +30,9 @@ Chrome 浏览器（任意较新版本），Edge、Brave、Arc 等 Chromium 内�
 **方式 A（推荐）**：在 GitHub 页面点右上角绿色的 `<> Code` 按钮 → 选 `Download ZIP`，会下载一个 `gloss-main.zip`。
 
 **方式 B**：如果已装 git，可用命令行：
+```
     git clone https://github.com/Esslooooo/gloss.git
+```
 
 ### 第二步：解压
 将 ZIP 解压到一可长期保留的位置，比如 `~/Documents/Gloss` 或`D:/Gloss`。
