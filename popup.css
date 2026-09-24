@@ -265,6 +265,9 @@ body {
   line-height: 1.6;
 }
 
+/* ============================================================
+   详情视图 — 与网页弹窗视觉统一
+   ============================================================ */
 .detail-content {
   flex: 1;
   overflow-y: auto;
@@ -282,14 +285,14 @@ body {
 .detail-word {
   font-size: 26px;
   font-weight: 700;
-  color: #1d1d1f;
+  color: #0f172a;
   margin-bottom: 6px;
   word-break: break-word;
   letter-spacing: -0.3px;
 }
 .detail-phonetic {
   font-size: 13px;
-  color: #86868b;
+  color: #64748b;
   font-family: "SF Mono", Menlo, monospace;
   margin-bottom: 20px;
   display: flex;
@@ -302,16 +305,16 @@ body {
   height: 26px;
   border: none;
   border-radius: 50%;
-  background: #f0f0f2;
-  color: #1d1d1f;
+  background: #f1f5f9;
+  color: #475569;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 0;
-  transition: background 0.15s;
+  transition: background 0.15s, color 0.15s;
 }
-.play-btn:hover { background: #e0e0e5; }
+.play-btn:hover { background: #dbeafe; color: #2563eb; }
 .play-btn:active { transform: scale(0.92); }
 
 .detail-section { margin-bottom: 22px; }
@@ -325,49 +328,77 @@ body {
 }
 
 .detail-pos {
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
-  color: #0071e3;
+  color: #2563eb;
   margin-bottom: 4px;
   margin-top: 12px;
 }
 .detail-pos:first-child { margin-top: 0; }
 .detail-def {
-  font-size: 13.5px;
-  color: #1d1d1f;
+  font-size: 14px;
+  color: #334155;
   line-height: 1.6;
-  margin-bottom: 2px;
+  margin-bottom: 3px;
 }
 
-.detail-example {
-  padding: 10px 12px;
-  background: #f5f5f7;
-  border-radius: 8px;
+.detail-examples-block {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: #f8fafc;
+  border-radius: 10px;
+}
+.detail-examples-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
   margin-bottom: 8px;
 }
-.detail-example .en {
-  font-size: 13px;
-  color: #1d1d1f;
-  margin-bottom: 3px;
-  line-height: 1.5;
+.detail-example-item {
+  margin-bottom: 8px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #e2e8f0;
 }
-.detail-example .zh {
-  font-size: 12px;
-  color: #86868b;
-  line-height: 1.5;
+.detail-example-item:last-child { margin-bottom: 0; padding-bottom: 0; border-bottom: none; }
+.detail-example-item .en {
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.55;
+  margin-bottom: 3px;
+}
+.detail-example-item .zh {
+  font-size: 12.5px;
+  color: #64748b;
+  line-height: 1.55;
 }
 
-.detail-phrase-row {
+.detail-phrases-block {
+  margin-top: 4px;
+  padding: 12px 14px;
+  background: #fffbeb;
+  border-radius: 10px;
+}
+.detail-phrases-title {
+  font-size: 10px;
+  font-weight: 600;
+  color: #d97706;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
+.detail-phrase-item {
   display: flex;
   justify-content: space-between;
-  gap: 12px;
-  padding: 7px 0;
+  gap: 10px;
+  padding: 4px 0;
   font-size: 12.5px;
-  border-bottom: 1px solid #f0f0f2;
+  border-bottom: 1px dashed #fde68a;
 }
-.detail-phrase-row:last-child { border-bottom: none; }
-.detail-phrase-row .en { color: #1d1d1f; font-weight: 500; }
-.detail-phrase-row .zh { color: #86868b; text-align: right; }
+.detail-phrase-item:last-child { border-bottom: none; }
+.detail-phrase-item .en { color: #78350f; font-weight: 500; flex-shrink: 0; }
+.detail-phrase-item .zh { color: #92400e; text-align: right; }
 
 .detail-note {
   font-size: 13px;
@@ -659,6 +690,78 @@ body {
   line-height: 1.5;
 }
 
+.settings-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.lemma-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border-radius: 13px;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+  white-space: nowrap;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.lemma-pill.on { background: #ecfdf5; color: #059669; }
+.lemma-pill.on:hover { background: #d1fae5; }
+.lemma-pill.on .lemma-dot {
+  background: #34c759;
+  box-shadow: 0 0 4px rgba(52, 199, 89, 0.7);
+}
+.lemma-pill.off { background: #f1f5f9; color: #64748b; }
+.lemma-pill.off:hover { background: #e2e8f0; }
+.lemma-pill.off .lemma-dot { background: #cbd5e1; }
+.lemma-pill:active { transform: scale(0.96); }
+
+.lemma-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: background 0.15s;
+}
+
+.info-btn {
+  width: 20px;
+  height: 20px;
+  border: none;
+  background: transparent;
+  color: #a1a1a6;
+  cursor: pointer;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  flex-shrink: 0;
+  transition: color 0.15s, background 0.15s;
+}
+.info-btn:hover { color: #0071e3; background: rgba(0,113,227,0.08); }
+.info-btn svg { pointer-events: none; width: 14px; height: 14px; }
+
+.info-popover {
+  display: none;
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: #f5f5f7;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #6e6e73;
+  line-height: 1.6;
+}
+.info-popover.show { display: block; }
+
 .tabbar {
   height: 52px;
   min-height: 52px;
@@ -740,7 +843,6 @@ body {
 .context-menu button.danger svg { color: #ff3b30; }
 .context-menu button.danger:hover { background: #ffe5e3; }
 
-/* 导出菜单 */
 .export-menu {
   position: fixed;
   z-index: 99999;

@@ -23,8 +23,9 @@ console.log('[Gloss BG] background.js 已执行');
 // IndexedDB
 // ============================================================
 const DB_NAME = 'glossDictDB';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 const STORE_NAME = 'words';
+const FORM_STORE = 'forms';
 
 function openDB() {
   return new Promise((resolve, reject) => {
@@ -32,18 +33,20 @@ function openDB() {
     req.onupgradeneeded = (e) => {
       const db = e.target.result;
       if (!db.objectStoreNames.contains(STORE_NAME)) db.createObjectStore(STORE_NAME);
+      if (!db.objectStoreNames.contains(FORM_STORE)) db.createObjectStore(FORM_STORE);
     };
     req.onsuccess = (e) => resolve(e.target.result);
     req.onerror = (e) => reject(e.target.error);
   });
 }
 
-async function dbPutBatch(entries) {
+async function dbPutBatch(entries, storeName) {
+  const name = storeName || STORE_NAME;
   const db = await openDB();
   try {
     await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readwrite');
-      const store = tx.objectStore(STORE_NAME);
+      const tx = db.transaction(name, 'readwrite');
+      const store = tx.objectStore(name);
       for (const [k, v] of entries) {
         try { store.put(v, k); } catch (e) {}
       }
@@ -56,12 +59,13 @@ async function dbPutBatch(entries) {
   }
 }
 
-async function dbGet(key) {
+async function dbGet(key, storeName) {
+  const name = storeName || STORE_NAME;
   const db = await openDB();
   try {
     return await new Promise((resolve, reject) => {
-      const tx = db.transaction(STORE_NAME, 'readonly');
-      const store = tx.objectStore(STORE_NAME);
+      const tx = db.transaction(name, 'readonly');
+      const store = tx.objectStore(name);
       const req = store.get(key);
       req.onsuccess = () => resolve(req.result);
       req.onerror = (e) => reject(e.target.error);
@@ -132,11 +136,12 @@ async function getDictRealStatus() {
   try {
     const r = await chrome.storage.local.get([
       '_dictInstalled', '_dictCount', '_dictStatus', '_dictProgress',
-      '_dictError', '_dictBytes', '_dictBytesTotal'
+      '_dictError', '_dictBytes', '_dictBytesTotal', '_dictFormCount'
     ]);
     return {
       installed: r._dictInstalled === true,
       count: r._dictCount || 0,
+      formCount: r._dictFormCount || 0,
       status: r._dictStatus || (r._dictInstalled ? 'installed' : 'not_installed'),
       progress: r._dictProgress || null,
       error: r._dictError || null,
@@ -144,7 +149,7 @@ async function getDictRealStatus() {
       bytesTotal: r._dictBytesTotal || 0
     };
   } catch (e) {
-    return { installed: false, count: 0, status: 'not_installed', progress: null, error: null, bytes: 0, bytesTotal: 0 };
+    return { installed: false, count: 0, formCount: 0, status: 'not_installed', progress: null, error: null, bytes: 0, bytesTotal: 0 };
   }
 }
 
@@ -203,12 +208,13 @@ async function startDictionaryDownload() {
 
   await chrome.storage.local.set({
     _dictStatus: 'downloading',
-    _dictProgress: { current: 0, total: DICT_PART_END, loaded: 0, startedAt: Date.now() },
+    _dictProgress: { current: 0, total: DICT_PART_END, loaded: 0, forms: 0, startedAt: Date.now() },
     _dictError: null,
     _dictBytes: 0,
     _dictBytesTotal: 0,
     _dictInstalled: false,
-    _dictCount: 0
+    _dictCount: 0,
+    _dictFormCount: 0
   });
 
   chrome.alarms.create('dictKeepAlive', { periodInMinutes: 0.5 });
@@ -237,7 +243,8 @@ async function cancelDictionaryDownload() {
     _dictBytes: 0,
     _dictBytesTotal: 0,
     _dictInstalled: false,
-    _dictCount: 0
+    _dictCount: 0,
+    _dictFormCount: 0
   });
   return { success: true };
 }
@@ -262,6 +269,7 @@ async function runDictionaryDownload() {
   dictInstalledCache = null;
 
   let totalLoaded = 0;
+  let totalForms = 0;
   let failed = 0;
   let totalBytes = 0;
   const startTime = Date.now();
@@ -274,6 +282,7 @@ async function runDictionaryDownload() {
 
     const r = await downloadPartFile(baseUrl, i, isLocal);
     if (r.count > 0) totalLoaded += r.count;
+    if (r.forms > 0) totalForms += r.forms;
     if (!r.ok) failed++;
     totalBytes += r.bytes || 0;
 
@@ -282,11 +291,13 @@ async function runDictionaryDownload() {
         current: i,
         total: DICT_PART_END,
         loaded: totalLoaded,
+        forms: totalForms,
         failed,
         bytes: totalBytes,
         startedAt: startTime
       },
-      _dictBytes: totalBytes
+      _dictBytes: totalBytes,
+      _dictFormCount: totalForms
     });
   }
 
@@ -295,7 +306,6 @@ async function runDictionaryDownload() {
     return;
   }
 
-  // 【新增】全部失败检测
   if (totalLoaded === 0) {
     console.warn('[Gloss BG] 全部下载失败，0 词条');
     await chrome.storage.local.set({
@@ -303,13 +313,13 @@ async function runDictionaryDownload() {
       _dictError: '所有文件下载失败（CDN 未就绪或网络问题）',
       _dictProgress: null,
       _dictInstalled: false,
-      _dictCount: 0
+      _dictCount: 0,
+      _dictFormCount: 0
     });
     chrome.alarms.clear('dictKeepAlive');
     return;
   }
 
-  // 写入验证
   const verifyHits = await verifyDictWrite();
   console.log('[Gloss BG] 写入验证: ' + verifyHits + ' 个探针命中');
 
@@ -320,7 +330,8 @@ async function runDictionaryDownload() {
       _dictError: 'IndexedDB 写入失败',
       _dictProgress: null,
       _dictInstalled: false,
-      _dictCount: 0
+      _dictCount: 0,
+      _dictFormCount: 0
     });
     chrome.alarms.clear('dictKeepAlive');
     return;
@@ -330,6 +341,7 @@ async function runDictionaryDownload() {
     _dictStatus: 'installed',
     _dictInstalled: true,
     _dictCount: totalLoaded,
+    _dictFormCount: totalForms,
     _dictInstalledAt: Date.now(),
     _dictProgress: null,
     _dictError: null,
@@ -341,7 +353,7 @@ async function runDictionaryDownload() {
   chrome.alarms.clear('dictKeepAlive');
 
   const elapsed = ((Date.now() - startTime) / 1000).toFixed(1);
-  console.log('[Gloss BG] 词典下载完成: ' + totalLoaded + ' 词条, ' + (totalBytes / 1024 / 1024).toFixed(1) + ' MB, 耗时 ' + elapsed + 's');
+  console.log('[Gloss BG] 词典下载完成: ' + totalLoaded + ' 词条, ' + totalForms + ' 变形映射, ' + (totalBytes / 1024 / 1024).toFixed(1) + ' MB, 耗时 ' + elapsed + 's');
 }
 
 async function verifyDictWrite() {
@@ -356,6 +368,30 @@ async function verifyDictWrite() {
   return hit;
 }
 
+function parseExchange(exchange, word) {
+  if (!exchange || typeof exchange !== 'string') return [];
+  const out = [];
+  const parts = exchange.split('/');
+  for (const part of parts) {
+    const idx = part.indexOf(':');
+    if (idx <= 0) continue;
+    const type = part.slice(0, idx).trim();
+    const form = part.slice(idx + 1).trim();
+    if (!form) continue;
+    if (type === '1') continue;
+    const lowForm = form.toLowerCase();
+    const lowWord = word.toLowerCase();
+    if (lowForm.indexOf(' ') !== -1) continue;
+    if (lowForm === lowWord) continue;
+    if (type === '0') {
+      out.push([lowWord, lowForm]);
+    } else {
+      out.push([lowForm, lowWord]);
+    }
+  }
+  return out;
+}
+
 async function downloadPartFile(baseUrl, partNum, isLocal) {
   const fileName = 'part_' + String(partNum).padStart(2, '0') + '.json';
   try {
@@ -367,14 +403,15 @@ async function downloadPartFile(baseUrl, partNum, isLocal) {
     const resp = await fetch(url);
     if (!resp.ok) {
       console.warn('[Gloss BG] ' + fileName + ' HTTP ' + resp.status);
-      return { ok: false, count: 0, bytes: 0 };
+      return { ok: false, count: 0, forms: 0, bytes: 0 };
     }
 
     const text = await resp.text();
-    if (!text) return { ok: false, count: 0, bytes: 0 };
+    if (!text) return { ok: false, count: 0, forms: 0, bytes: 0 };
     const bytes = text.length;
 
     const entries = [];
+    const formEntries = [];
     const lines = text.split('\n');
     for (const line of lines) {
       const trimmed = line.trim();
@@ -382,7 +419,10 @@ async function downloadPartFile(baseUrl, partNum, isLocal) {
       try {
         const entry = JSON.parse(trimmed);
         if (!entry || !entry.word) continue;
-        entries.push([entry.word.toLowerCase(), entry]);
+        const lower = entry.word.toLowerCase();
+        entries.push([lower, entry]);
+        const maps = parseExchange(entry.exchange, lower);
+        for (const m of maps) formEntries.push(m);
       } catch (e) {}
     }
 
@@ -390,18 +430,27 @@ async function downloadPartFile(baseUrl, partNum, isLocal) {
     for (let i = 0; i < entries.length; i += WRITE_CHUNK) {
       if (downloadCancelled) break;
       try {
-        await dbPutBatch(entries.slice(i, i + WRITE_CHUNK));
+        await dbPutBatch(entries.slice(i, i + WRITE_CHUNK), STORE_NAME);
       } catch (e) {
         writeFailures++;
         console.warn('[Gloss BG] ' + fileName + ' 写入块 ' + i + ' 失败:', e.message);
       }
     }
 
-    console.log('[Gloss BG] ' + fileName + ' 完成: ' + entries.length + ' 词条, 写入失败 ' + writeFailures + ' 块');
-    return { ok: true, count: entries.length, bytes };
+    for (let i = 0; i < formEntries.length; i += WRITE_CHUNK) {
+      if (downloadCancelled) break;
+      try {
+        await dbPutBatch(formEntries.slice(i, i + WRITE_CHUNK), FORM_STORE);
+      } catch (e) {
+        console.warn('[Gloss BG] ' + fileName + ' 变形索引写入失败:', e.message);
+      }
+    }
+
+    console.log('[Gloss BG] ' + fileName + ' 完成: ' + entries.length + ' 词条, ' + formEntries.length + ' 变形映射, 写入失败 ' + writeFailures + ' 块');
+    return { ok: true, count: entries.length, forms: formEntries.length, bytes };
   } catch (err) {
     console.warn('[Gloss BG] ' + fileName + ' 失败:', err.message);
-    return { ok: false, count: 0, bytes: 0, error: err.message };
+    return { ok: false, count: 0, forms: 0, bytes: 0, error: err.message };
   }
 }
 
@@ -461,12 +510,20 @@ function buildMeaningsFromGroups(groups) {
 
 async function lookupWordLocal(word) {
   const lower = word.toLowerCase();
-  let entry = await dbGet(lower);
 
-  if (!entry && lower.endsWith('s')) entry = await dbGet(lower.slice(0, -1));
-  if (!entry && lower.endsWith('es')) entry = await dbGet(lower.slice(0, -2));
-  if (!entry && lower.endsWith('ed')) entry = await dbGet(lower.slice(0, -2));
-  if (!entry && lower.endsWith('ing')) entry = await dbGet(lower.slice(0, -3));
+  let entry = await dbGet(lower, STORE_NAME);
+  let lemma = null;
+
+  if (!entry) {
+    const mapped = await dbGet(lower, FORM_STORE);
+    if (mapped) {
+      const base = await dbGet(mapped, STORE_NAME);
+      if (base) {
+        entry = base;
+        lemma = mapped;
+      }
+    }
+  }
 
   if (!entry) return null;
 
@@ -477,7 +534,31 @@ async function lookupWordLocal(word) {
   const groups = groupDefinitionsByPos(rawLines);
   const meanings = buildMeaningsFromGroups(groups);
 
-  return { word, phonetic: formatLocalPhonetic(entry.phonetic), meanings, examples: [], phrases: [] };
+  return {
+    word,
+    lemma: lemma || '',
+    phonetic: formatLocalPhonetic(entry.phonetic),
+    meanings,
+    examples: [],
+    phrases: []
+  };
+}
+
+// ============================================================
+// 有道原型提取
+// ============================================================
+function extractLemmaFromYoudao(json, word) {
+  const w = (word || '').toLowerCase();
+  const ec = json && json.ec;
+  if (!ec || !Array.isArray(ec.word) || !ec.word[0]) return '';
+
+  const proto = ec.word[0].prototype;
+  if (!proto || typeof proto !== 'string') return '';
+
+  const base = proto.toLowerCase().trim();
+  if (!base || base === w) return '';
+  if (base.indexOf(' ') !== -1) return '';
+  return base;
 }
 
 // ============================================================
@@ -604,12 +685,13 @@ async function lookupWordYoudao(word) {
     const phonetic = extractYoudaoPhonetic(json);
     const rawLines = extractYoudaoRawLines(json);
     if (rawLines.length === 0) return { notFound: true };
+    const lemma = extractLemmaFromYoudao(json, word);
     const groups = groupDefinitionsByPos(rawLines);
     const meanings = buildMeaningsFromGroups(groups);
     const examples = extractYoudaoExamples(json);
     const phrases = extractYoudaoPhrases(json);
     const audio = extractYoudaoAudio(json, word);
-    return { data: { word, phonetic, audio, meanings, examples, phrases } };
+    return { data: { word, lemma, phonetic, audio, meanings, examples, phrases } };
   } catch (err) {
     clearTimeout(timer);
     if (err.name === 'AbortError') throw new Error('有道查词超时');
@@ -653,6 +735,7 @@ async function lookupWordFreeDict(word) {
     return {
       data: {
         word: entry.word || word,
+        lemma: '',
         phonetic: phoneticText ? '/' + phoneticText + '/' : '',
         audio: audioUrl,
         meanings,
@@ -820,7 +903,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
   if (message.type === 'DICT_STATUS') {
     (async () => {
       try { sendResponse(await getDictRealStatus()); }
-      catch (err) { sendResponse({ installed: false, count: 0, status: 'not_installed', error: err.message }); }
+      catch (err) { sendResponse({ installed: false, count: 0, formCount: 0, status: 'not_installed', error: err.message }); }
     })();
     return true;
   }
@@ -845,6 +928,7 @@ chrome.runtime.onMessage.addListener(function(message, sender, sendResponse) {
         await chrome.storage.local.set({
           _dictInstalled: false,
           _dictCount: 0,
+          _dictFormCount: 0,
           _dictInstalledAt: 0,
           _dictStatus: 'not_installed',
           _dictProgress: null,

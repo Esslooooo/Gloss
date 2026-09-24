@@ -1,6 +1,3 @@
-/* ============================================================
-   网页内双击弹窗样式
-   ============================================================ */
 .wcx-popup {
   position: fixed;
   min-width: 240px;
@@ -35,17 +32,38 @@
 .wcx-popup .wcx-header {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   padding-bottom: 8px;
   border-bottom: 1px solid #f1f5f9;
   margin-bottom: 8px;
   gap: 8px;
 }
 
-.wcx-popup .wcx-header strong {
+.wcx-popup .wcx-title {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+  flex-wrap: wrap;
+}
+
+.wcx-popup .wcx-title strong {
   font-size: 16px;
   font-weight: 700;
   color: #0f172a;
+  word-break: break-word;
+}
+
+.wcx-popup .wcx-lemma {
+  font-size: 11px;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .wcx-popup .wcx-header-right {
@@ -66,6 +84,11 @@
 .wcx-popup .wcx-status.wcx-saved {
   color: #059669;
   background: #ecfdf5;
+}
+
+.wcx-popup .wcx-status.wcx-not-saved {
+  color: #94a3b8;
+  background: #f8fafc;
 }
 
 .wcx-popup .wcx-source {
@@ -204,9 +227,6 @@
   padding: 10px 0;
 }
 
-/* ============================================================
-   句子翻译弹框
-   ============================================================ */
 .wcx-sentence-popup {
   position: fixed;
   min-width: 260px;
@@ -300,56 +320,4 @@
   border-color: #6ee7b7;
   color: #059669;
   cursor: default;
-}
-
-/* ============================================================
-   生词记录胶囊按钮
-   ============================================================ */
-.wcx-popup .wcx-record-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  height: 22px;
-  padding: 0 8px;
-  border-radius: 11px;
-  border: none;
-  font-size: 11px;
-  font-weight: 500;
-  cursor: pointer;
-  font-family: inherit;
-  transition: all 0.15s;
-  white-space: nowrap;
-  line-height: 1;
-}
-
-.wcx-popup .wcx-record-pill.on {
-  background: #ecfdf5;
-  color: #059669;
-}
-.wcx-popup .wcx-record-pill.on .wcx-pill-dot {
-  background: #34c759;
-  box-shadow: 0 0 4px rgba(52, 199, 89, 0.6);
-}
-
-.wcx-popup .wcx-record-pill.off {
-  background: #f1f5f9;
-  color: #94a3b8;
-}
-.wcx-popup .wcx-record-pill.off .wcx-pill-dot {
-  background: #cbd5e1;
-}
-
-.wcx-popup .wcx-record-pill:hover {
-  filter: brightness(0.97);
-}
-.wcx-popup .wcx-record-pill:active {
-  transform: scale(0.96);
-}
-
-.wcx-popup .wcx-pill-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  flex-shrink: 0;
-  transition: background 0.15s;
 }

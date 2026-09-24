@@ -1,8 +1,6 @@
-// ============================================================
-// 启用状态
-// ============================================================
 let wcxEnabled = true;
 let wcxRecordWords = true;
+let wcxStoreLemma = true;
 
 async function checkEnabled() {
   if (!isExtensionAlive()) return;
@@ -23,9 +21,9 @@ async function checkEnabled() {
 
 async function loadRecordWordsSetting() {
   try {
-    const r = await chrome.storage.local.get('_recordWords');
+    const r = await chrome.storage.local.get(['_recordWords', '_storeLemma']);
     wcxRecordWords = r._recordWords !== false;
-    console.log('[Gloss] 生词记录:', wcxRecordWords ? '开启' : '关闭');
+    wcxStoreLemma = r._storeLemma !== false;
   } catch (e) {}
 }
 
@@ -35,7 +33,9 @@ if (typeof chrome !== 'undefined' && chrome.storage && chrome.storage.onChanged)
     if (changes._enabled || changes._blacklist) checkEnabled();
     if (changes._recordWords) {
       wcxRecordWords = changes._recordWords.newValue !== false;
-      console.log('[Gloss] 生词记录已切换:', wcxRecordWords ? '开启' : '关闭');
+    }
+    if (changes._storeLemma) {
+      wcxStoreLemma = changes._storeLemma.newValue !== false;
     }
   });
 }
@@ -62,9 +62,6 @@ loadRecordWordsSetting();
 
 console.log('[Gloss] content.js 已加载');
 
-// ============================================================
-// 获取选中文本
-// ============================================================
 function getSelectedText() {
   const active = document.activeElement;
   if (active) {
@@ -138,9 +135,6 @@ function captureAnchorForSelection() {
   return null;
 }
 
-// ============================================================
-// 弹框 UI
-// ============================================================
 let wcxPopup = null;
 let wcxSentencePopup = null;
 let wcxWord = '';
@@ -223,8 +217,8 @@ function getAnchorRect() {
 function wcxUpdatePosition(rect, el) {
   if (!el || !rect) return;
 
-  const w = el.offsetWidth || 320;
-  const h = el.offsetHeight || 240;
+  const w = 340;
+  const h = 260;
   const gap = 8;
   const edge = 10;
   const vw = window.innerWidth;
@@ -325,6 +319,7 @@ function wcxShowPopup(rect, word) {
   wcxPopup.innerHTML = '<div class="wcx-header"><strong>' + word + '</strong><span class="wcx-status">查询中...</span></div><div class="wcx-body">正在获取释义...</div>';
   wcxPopup.style.position = 'fixed';
   wcxPopup.style.zIndex = '999999';
+  wcxPopup.style.visibility = 'hidden';
 
   ['mousedown', 'mouseup', 'click', 'dblclick'].forEach(evt => {
     wcxPopup.addEventListener(evt, e => e.stopPropagation());
@@ -332,6 +327,7 @@ function wcxShowPopup(rect, word) {
 
   document.documentElement.appendChild(wcxPopup);
   wcxUpdatePosition(rect, wcxPopup);
+  wcxPopup.style.visibility = 'visible';
 
   setTimeout(() => {
     document.addEventListener('mousedown', wcxHandleOutsideClick, true);
@@ -361,13 +357,15 @@ function wcxShowSentencePopup(rect, sentence) {
 
   wcxSentencePopup.style.position = 'fixed';
   wcxSentencePopup.style.zIndex = '999999';
+  wcxSentencePopup.style.visibility = 'hidden';
 
   ['mousedown', 'mouseup', 'click', 'dblclick'].forEach(evt => {
-    wcxSentencePopup.addEventListener(evt, (e) => e.stopPropagation());
+    wcxSentencePopup.addEventListener(evt, e => e.stopPropagation());
   });
 
   document.documentElement.appendChild(wcxSentencePopup);
   wcxUpdatePosition(rect, wcxSentencePopup);
+  wcxSentencePopup.style.visibility = 'visible';
 
   setTimeout(() => {
     document.addEventListener('mousedown', wcxHandleOutsideClick, true);
@@ -409,13 +407,6 @@ function updateSentenceTranslation(translation, sourceText) {
 
   actionsEl.appendChild(clipBtn);
   resultEl.parentNode.appendChild(actionsEl);
-
-  setTimeout(() => {
-    if (wcxSentencePopup && wcxAnchor) {
-      const rect = getAnchorRect();
-      if (rect) wcxUpdatePosition(rect, wcxSentencePopup);
-    }
-  }, 0);
 }
 
 async function saveClip(text, translation) {
@@ -614,21 +605,33 @@ async function wcxDoLookup(word) {
   if (!response || !response.success) {
     wcxPopup.innerHTML = '<div class="wcx-header"><strong>' + escapeHtml(word) + '</strong></div>' +
       '<div class="wcx-body wcx-error">' + escapeHtml((response && response.error) || '查询失败') + '</div>';
-    setTimeout(() => {
-      if (wcxPopup && wcxAnchor) {
-        const rect = getAnchorRect();
-        if (rect) wcxUpdatePosition(rect, wcxPopup);
-      }
-    }, 0);
     return;
   }
 
-  const data = response.data;
-  const isOnline = data.source === 'online';
+  let data = response.data;
+  let isOnline = data.source === 'online';
+  const lemma = (data.lemma || '').trim();
+  const useLemma = wcxStoreLemma && lemma && lemma !== word;
 
-  // 只有开启记录时才保存生词
+  if (useLemma) {
+    const resp2 = await queryBackground(lemma);
+    if (!wcxPopup || wcxWord !== word) return;
+    if (resp2 && resp2.success) {
+      data = resp2.data;
+      data.lemma = lemma;
+      isOnline = data.source === 'online';
+    }
+  }
+
+  const storeKey = useLemma ? lemma : word;
+
   if (wcxRecordWords) {
-    saveToVocabulary(word, data);
+    saveToVocabulary(storeKey, data);
+  }
+
+  let titleHtml = '<strong>' + escapeHtml(word) + '</strong>';
+  if (useLemma) {
+    titleHtml += '<span class="wcx-lemma">原形 ' + escapeHtml(lemma) + '</span>';
   }
 
   let phoneticHtml = '';
@@ -650,18 +653,11 @@ async function wcxDoLookup(word) {
 
   wcxPopup.innerHTML =
     '<div class="wcx-header">' +
-      '<strong>' + escapeHtml(word) + '</strong>' +
+      '<div class="wcx-title">' + titleHtml + '</div>' +
       '<div class="wcx-header-right">' + sourceLabel + savedLabel + '</div>' +
     '</div>' +
     phoneticBlock +
     '<div class="wcx-body">' + meaningsHtml + phrasesHtml + examplesHtml + '</div>';
-
-  setTimeout(() => {
-    if (wcxPopup && wcxAnchor) {
-      const rect = getAnchorRect();
-      if (rect) wcxUpdatePosition(rect, wcxPopup);
-    }
-  }, 0);
 
   const playButton = wcxPopup.querySelector('.wcx-play-audio');
   if (playButton) {

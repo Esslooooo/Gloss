@@ -279,22 +279,24 @@ function renderDetail() {
   }
 
   if (item.phrases && item.phrases.length) {
-    parts.push('<div class="detail-section"><div class="detail-section-title">短语</div>');
+    parts.push('<div class="detail-phrases-block">');
+    parts.push('<div class="detail-phrases-title">短语</div>');
     item.phrases.forEach(p => {
-      parts.push(`<div class="detail-phrase-row"><span class="en">${escapeHtml(p.phrase)}</span><span class="zh">${escapeHtml(p.translation)}</span></div>`);
+      parts.push(`<div class="detail-phrase-item"><span class="en">${escapeHtml(p.phrase)}</span><span class="zh">${escapeHtml(p.translation)}</span></div>`);
     });
     parts.push('</div>');
   }
 
   if (item.examples && item.examples.length) {
-    parts.push('<div class="detail-section"><div class="detail-section-title">例句</div>');
+    parts.push('<div class="detail-examples-block">');
+    parts.push('<div class="detail-examples-title">例句</div>');
     item.examples.forEach(ex => {
-      parts.push(`<div class="detail-example"><div class="en">${escapeHtml(ex.en)}</div>${ex.zh ? `<div class="zh">${escapeHtml(ex.zh)}</div>` : ''}</div>`);
+      parts.push(`<div class="detail-example-item"><div class="en">${escapeHtml(ex.en)}</div>${ex.zh ? `<div class="zh">${escapeHtml(ex.zh)}</div>` : ''}</div>`);
     });
     parts.push('</div>');
   }
 
-  parts.push('<div class="detail-section"><div class="detail-section-title">笔记</div>');
+  parts.push('<div class="detail-section" style="margin-top:22px;"><div class="detail-section-title">笔记</div>');
   if (state.editingNote) {
     parts.push(`<textarea class="note-area" id="noteInput" placeholder="添加笔记...">${escapeHtml(item.note || '')}</textarea>`);
     parts.push('<div class="note-actions">');
@@ -832,14 +834,13 @@ loadData()
   })
   .catch((err) => { console.error('[Gloss Popup] 初始化失败:', err); });
 
-  // ============================================================
+// ============================================================
 // 生词记录开关
 // ============================================================
 async function initRecordToggle() {
   const btn = document.getElementById('recordToggle');
   if (!btn) return;
 
-  const dotEl = btn.querySelector('.record-dot');
   const textEl = btn.querySelector('.record-text');
 
   function updateUI(recordWords) {
@@ -856,14 +857,12 @@ async function initRecordToggle() {
     }
   }
 
-  // 读取当前状态
   try {
     const r = await chrome.storage.local.get('_recordWords');
     const recordWords = r._recordWords !== false;
     updateUI(recordWords);
   } catch (e) {}
 
-  // 点击切换
   btn.addEventListener('click', async (e) => {
     e.stopPropagation();
     try {
@@ -878,7 +877,6 @@ async function initRecordToggle() {
     }
   });
 
-  // 监听外部变化（虽然一般不会，但保险）
   chrome.storage.onChanged.addListener((changes, area) => {
     if (area === 'local' && changes._recordWords) {
       updateUI(changes._recordWords.newValue !== false);
@@ -887,6 +885,63 @@ async function initRecordToggle() {
 }
 
 initRecordToggle();
+
+// ============================================================
+// 记录原形开关
+// ============================================================
+async function initLemmaToggle() {
+  const btn = document.getElementById('lemmaToggle');
+  const infoBtn = document.getElementById('lemmaInfoBtn');
+  const popover = document.getElementById('lemmaInfoPopover');
+  if (!btn) return;
+
+  const textEl = btn.querySelector('.lemma-text');
+
+  function updateUI(on) {
+    btn.classList.toggle('on', on);
+    btn.classList.toggle('off', !on);
+    btn.title = on ? '点击改为记录变形' : '点击改为记录原形';
+    if (textEl) textEl.textContent = on ? '记录原形' : '记录变形';
+  }
+
+  try {
+    const r = await chrome.storage.local.get('_storeLemma');
+    updateUI(r._storeLemma !== false);
+  } catch (e) { updateUI(true); }
+
+  btn.addEventListener('click', async () => {
+    try {
+      const r = await chrome.storage.local.get('_storeLemma');
+      const current = r._storeLemma !== false;
+      const next = !current;
+      await chrome.storage.local.set({ _storeLemma: next });
+      updateUI(next);
+      console.log('[Gloss Popup] 记录模式:', next ? '记录原形' : '记录变形');
+    } catch (e) {
+      console.error('[Gloss Popup] 切换失败:', e);
+    }
+  });
+
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'local' && changes._storeLemma) {
+      updateUI(changes._storeLemma.newValue !== false);
+    }
+  });
+
+  if (infoBtn && popover) {
+    infoBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      popover.classList.toggle('show');
+    });
+    document.addEventListener('click', (e) => {
+      if (popover.classList.contains('show') && !popover.contains(e.target) && !infoBtn.contains(e.target)) {
+        popover.classList.remove('show');
+      }
+    });
+  }
+}
+
+initLemmaToggle();
 
 // ============================================================
 // 摘抄导出
@@ -994,7 +1049,6 @@ async function exportClips(format) {
   const url = URL.createObjectURL(blob);
 
   try {
-    // 优先用 downloads API，会弹出"另存为"对话框，用户可自选位置
     if (chrome.downloads && chrome.downloads.download) {
       const downloadId = await chrome.downloads.download({
         url: url,
@@ -1003,7 +1057,6 @@ async function exportClips(format) {
       });
       console.log('[Gloss Popup] 导出成功, downloadId:', downloadId);
     } else {
-      // 兜底：直接触发下载（无"另存为"对话框）
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
@@ -1017,7 +1070,6 @@ async function exportClips(format) {
   setTimeout(() => URL.revokeObjectURL(url), 60000);
 }
 
-// 绑定导出按钮
 (function initExportClips() {
   const btn = document.getElementById('exportClipsBtn');
   const menu = document.getElementById('exportMenu');
@@ -1026,7 +1078,6 @@ async function exportClips(format) {
   btn.addEventListener('click', (e) => {
     e.stopPropagation();
     const rect = btn.getBoundingClientRect();
-    // 显示在按钮下方右侧对齐
     menu.style.top = (rect.bottom + 4) + 'px';
     menu.style.right = (window.innerWidth - rect.right) + 'px';
     menu.classList.add('show');
@@ -1040,7 +1091,6 @@ async function exportClips(format) {
     exportClips(item.dataset.format);
   });
 
-  // 点击其他地方关闭菜单
   document.addEventListener('click', (e) => {
     if (menu.classList.contains('show') && !menu.contains(e.target) && e.target !== btn) {
       menu.classList.remove('show');

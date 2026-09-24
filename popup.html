@@ -133,6 +133,25 @@
       <div id="blacklistItems"></div>
     </div>
     <div class="settings-group">
+      <div class="settings-label">查词记录</div>
+      <div class="settings-row">
+        <button class="lemma-pill on" id="lemmaToggle" title="点击改为记录变形">
+          <span class="lemma-dot"></span>
+          <span class="lemma-text">记录原形</span>
+        </button>
+        <button class="info-btn" id="lemmaInfoBtn" title="说明">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="16" x2="12" y2="12"></line>
+            <line x1="12" y1="8" x2="12.01" y2="8"></line>
+          </svg>
+        </button>
+      </div>
+      <div class="info-popover" id="lemmaInfoPopover">
+        双击变形词（如 buildings）时，只把原形（building）加入生词本。关闭时按双击到的词形记录。
+      </div>
+    </div>
+    <div class="settings-group">
       <div class="settings-label">词典源</div>
       <select id="dictSourceSelect" class="settings-select">
         <option value="auto">本地优先</option>
